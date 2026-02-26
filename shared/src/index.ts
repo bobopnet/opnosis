@@ -23,6 +23,7 @@ export {
     OPNOSIS_ADDRESS,
     MAX_ORDERS,
     FEE_DENOMINATOR,
+    FEE_NUMERATOR,
     TOKEN_DECIMALS,
     BASE_UNIT,
     EXPLORER_BASE_URL,
@@ -38,3 +39,5 @@ export {
     formatPrice,
     getAuctionStatus,
 } from './format.js';
+export type { KnownToken } from './tokens.js';
+export { KNOWN_TOKENS } from './tokens.js';

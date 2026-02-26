@@ -16,8 +16,17 @@ export const OPNOSIS_ADDRESS: string = env('OPNOSIS_CONTRACT') || env('VITE_OPNO
 /** Maximum orders per auction (matches contract MAX_ORDERS). */
 export const MAX_ORDERS = 100;
 
-/** Fee denominator used by the contract (feeNumerator / FEE_DENOMINATOR). */
+/**
+ * Fee denominator used by the contract (feeNumerator / FEE_DENOMINATOR).
+ *
+ * To activate 0.1% protocol fee post-deployment, call:
+ *   setFeeParameters(1n, feeReceiverAddress)
+ * where 1/1000 = 0.1%.  Fee is deducted from the sell amount at settlement.
+ */
 export const FEE_DENOMINATOR = 1000n;
+
+/** Default fee numerator (0.1% = 1/1000). Set via setFeeParameters after deploy. */
+export const FEE_NUMERATOR = 1n;
 
 /** Default token decimals for OPNet OP20 tokens. */
 export const TOKEN_DECIMALS = 8;

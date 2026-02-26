@@ -15,8 +15,8 @@ import { networks } from '@btc-vision/bitcoin';
 import type { AbstractRpcProvider } from 'opnet';
 import type { WalletState } from '../types.js';
 
-const MAINNET_RPC = 'https://mainnet.opnet.org/v1/json-rpc';
-const TESTNET_RPC = 'https://testnet.opnet.org/v1/json-rpc';
+const MAINNET_RPC = 'https://mainnet.opnet.org';
+const TESTNET_RPC = 'https://testnet.opnet.org';
 
 export interface UseWalletReturn {
     readonly wallet: WalletState;

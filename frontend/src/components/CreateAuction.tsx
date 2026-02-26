@@ -1,37 +1,102 @@
 import { useState } from 'react';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
-import { parseTokenAmount } from '@opnosis/shared';
+import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR } from '@opnosis/shared';
+import {
+    color, font, card, btnPrimary, btnDisabled,
+    input as inputStyle, label as labelStyle, sectionTitle,
+    statusMsg, dismissBtn,
+} from '../styles.js';
+import { TokenSelect } from './TokenSelect.js';
+import { HelpTip } from './HelpTip.js';
 
-const formStyles = {
-    container: { background: '#1e1e2e', borderRadius: '12px', padding: '24px', border: '1px solid #2d2d3f' } as const,
-    title: { fontSize: '18px', fontWeight: 600, color: '#fff', marginBottom: '16px' } as const,
-    field: { marginBottom: '12px' } as const,
-    label: { display: 'block', color: '#9ca3af', fontSize: '12px', marginBottom: '4px' } as const,
-    input: {
-        width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #374151',
-        background: '#0f0f1e', color: '#e2e8f0', fontSize: '14px', outline: 'none',
-    } as const,
-    row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' } as const,
-    btn: {
-        width: '100%', padding: '12px', borderRadius: '8px', border: 'none',
-        background: '#6366f1', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-        marginTop: '8px',
-    } as const,
-    disabled: { opacity: 0.5, cursor: 'not-allowed' } as const,
-    status: (isError: boolean) => ({
-        marginTop: '12px', padding: '10px', borderRadius: '6px', fontSize: '13px',
-        background: isError ? '#1c0d0d' : '#0d1c1c',
-        color: isError ? '#ef4444' : '#10b981',
-    }) as const,
+const s = {
+    container: {
+        ...card,
+        borderLeft: `1px solid ${color.borderSubtle}`,
+        maxWidth: '720px',
+    } as React.CSSProperties,
+    row: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '16px',
+    } as React.CSSProperties,
+    field: {
+        marginBottom: '16px',
+    } as React.CSSProperties,
+    stepRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '28px',
+    } as React.CSSProperties,
+    stepCircle: (active: boolean): React.CSSProperties => ({
+        width: '28px',
+        height: '28px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: font.display,
+        fontSize: '13px',
+        fontWeight: 700,
+        background: active ? color.amber : color.bgElevated,
+        color: active ? color.bgDeep : color.textMuted,
+        border: active ? 'none' : `1px solid ${color.borderSubtle}`,
+    }),
+    stepLine: (done: boolean): React.CSSProperties => ({
+        width: '40px',
+        height: '2px',
+        background: done ? color.amber : color.borderSubtle,
+        transition: 'background 0.3s',
+    }),
+    stepLabel: (active: boolean): React.CSSProperties => ({
+        fontFamily: font.body,
+        fontSize: '14px',
+        color: active ? color.textPrimary : color.textMuted,
+        fontWeight: active ? 600 : 400,
+    }),
+    warningBox: {
+        color: color.warning,
+        marginBottom: '16px',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        background: 'rgba(245, 158, 11, 0.08)',
+        border: '1px solid rgba(245, 158, 11, 0.2)',
+        fontFamily: font.body,
+        fontSize: '14px',
+    } as React.CSSProperties,
+    checkbox: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        color: color.textSecondary,
+        fontSize: '14px',
+        fontFamily: font.body,
+        marginBottom: '16px',
+        cursor: 'pointer',
+    } as React.CSSProperties,
+    feeInfo: {
+        color: color.amber,
+        marginBottom: '16px',
+        padding: '10px 14px',
+        borderRadius: '8px',
+        background: 'rgba(232, 148, 26, 0.06)',
+        border: `1px solid rgba(232, 148, 26, 0.15)`,
+        fontFamily: font.body,
+        fontSize: '14px',
+    } as React.CSSProperties,
 };
 
 interface Props {
     readonly connected: boolean;
+    readonly network: string;
     readonly opnosis: ReturnType<typeof useOpnosis>;
     readonly onCreated?: () => void;
 }
 
-export function CreateAuction({ connected, opnosis, onCreated }: Props) {
+const feePercent = `${Number(FEE_NUMERATOR * 100n) / Number(FEE_DENOMINATOR)}%`;
+
+export function CreateAuction({ connected, network, opnosis, onCreated }: Props) {
     const [auctioningToken, setAuctioningToken] = useState('');
     const [biddingToken, setBiddingToken] = useState('');
     const [sellAmount, setSellAmount] = useState('');
@@ -70,60 +135,77 @@ export function CreateAuction({ connected, opnosis, onCreated }: Props) {
     const busy = txState.status === 'pending';
 
     return (
-        <div style={formStyles.container}>
-            <div style={formStyles.title}>Create Auction</div>
-            {!connected && <div style={{ color: '#f59e0b', marginBottom: '12px' }}>Connect wallet first</div>}
+        <div style={s.container}>
+            <div style={sectionTitle}>Create Auction</div>
 
-            <div style={formStyles.row}>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Auctioning Token Address</label>
-                    <input style={formStyles.input} value={auctioningToken} onChange={(e) => setAuctioningToken(e.target.value)} placeholder="0x..." />
+            {/* Step indicator */}
+            <div style={s.stepRow}>
+                <div style={s.stepCircle(step === 'approve')}>1</div>
+                <span style={s.stepLabel(step === 'approve')}>Approve</span>
+                <div style={s.stepLine(step === 'create')} />
+                <div style={s.stepCircle(step === 'create')}>2</div>
+                <span style={s.stepLabel(step === 'create')}>Create</span>
+            </div>
+
+            {!connected && <div style={s.warningBox}>Connect wallet first</div>}
+
+            <div style={s.feeInfo}>Protocol fee: {feePercent} of sell amount (deducted at settlement)</div>
+
+            <div style={s.row}>
+                <TokenSelect
+                    label="Auctioning Token"
+                    help="The OP-20 token you are selling. The total sell amount will be distributed to winning bidders."
+                    value={auctioningToken}
+                    onChange={setAuctioningToken}
+                    network={network}
+                />
+                <TokenSelect
+                    label="Bidding Token"
+                    help="The OP-20 token bidders use to place bids. You receive this token from winning bids."
+                    value={biddingToken}
+                    onChange={setBiddingToken}
+                    network={network}
+                />
+            </div>
+            <div style={s.row}>
+                <div style={s.field}>
+                    <label style={labelStyle}>Sell Amount<HelpTip text="Total number of tokens you are putting up for auction." /></label>
+                    <input style={inputStyle} value={sellAmount} onChange={(e) => setSellAmount(e.target.value)} placeholder="100.0" />
                 </div>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Bidding Token Address</label>
-                    <input style={formStyles.input} value={biddingToken} onChange={(e) => setBiddingToken(e.target.value)} placeholder="0x..." />
+                <div style={s.field}>
+                    <label style={labelStyle}>Min Buy Amount<HelpTip text="Minimum total bidding tokens you will accept for the entire sell amount. Sets the reserve price." /></label>
+                    <input style={inputStyle} value={minBuyAmount} onChange={(e) => setMinBuyAmount(e.target.value)} placeholder="50.0" />
                 </div>
             </div>
-            <div style={formStyles.row}>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Sell Amount</label>
-                    <input style={formStyles.input} value={sellAmount} onChange={(e) => setSellAmount(e.target.value)} placeholder="100.0" />
+            <div style={s.row}>
+                <div style={s.field}>
+                    <label style={labelStyle}>Min Bid Per Order<HelpTip text="Smallest bid a single bidder can place. Prevents dust bids. 0 = no minimum." /></label>
+                    <input style={inputStyle} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
                 </div>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Min Buy Amount</label>
-                    <input style={formStyles.input} value={minBuyAmount} onChange={(e) => setMinBuyAmount(e.target.value)} placeholder="50.0" />
-                </div>
-            </div>
-            <div style={formStyles.row}>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Min Bid Per Order</label>
-                    <input style={formStyles.input} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
-                </div>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Min Funding Threshold</label>
-                    <input style={formStyles.input} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
+                <div style={s.field}>
+                    <label style={labelStyle}>Min Funding Threshold<HelpTip text="Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. 0 = disabled." /></label>
+                    <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
                 </div>
             </div>
-            <div style={formStyles.row}>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Cancel Window (minutes)</label>
-                    <input style={formStyles.input} type="number" value={cancellationMinutes} onChange={(e) => setCancellationMinutes(e.target.value)} />
+            <div style={s.row}>
+                <div style={s.field}>
+                    <label style={labelStyle}>Cancel Window (minutes)<HelpTip text="Minutes from now during which bidders can cancel orders. After this, all bids are final." /></label>
+                    <input style={inputStyle} type="number" value={cancellationMinutes} onChange={(e) => setCancellationMinutes(e.target.value)} />
                 </div>
-                <div style={formStyles.field}>
-                    <label style={formStyles.label}>Auction Duration (minutes)</label>
-                    <input style={formStyles.input} type="number" value={auctionMinutes} onChange={(e) => setAuctionMinutes(e.target.value)} />
+                <div style={s.field}>
+                    <label style={labelStyle}>Auction Duration (minutes)<HelpTip text="Minutes from now the auction accepts bids. After this, the auction can be settled." /></label>
+                    <input style={inputStyle} type="number" value={auctionMinutes} onChange={(e) => setAuctionMinutes(e.target.value)} />
                 </div>
             </div>
-            <div style={formStyles.field}>
-                <label style={{ ...formStyles.label, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input type="checkbox" checked={atomicClose} onChange={(e) => setAtomicClose(e.target.checked)} />
-                    Allow atomic closure
-                </label>
-            </div>
+            <label style={s.checkbox}>
+                <input type="checkbox" checked={atomicClose} onChange={(e) => setAtomicClose(e.target.checked)} />
+                Allow atomic closure
+                <HelpTip text="When enabled, anyone can settle the auction immediately once enough bids clear the reserve price, without waiting for the end time." />
+            </label>
 
             {step === 'approve' ? (
                 <button
-                    style={{ ...formStyles.btn, ...(busy || !connected ? formStyles.disabled : {}) }}
+                    style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
                     disabled={busy || !connected}
                     onClick={() => void handleApprove()}
                 >
@@ -131,7 +213,7 @@ export function CreateAuction({ connected, opnosis, onCreated }: Props) {
                 </button>
             ) : (
                 <button
-                    style={{ ...formStyles.btn, ...(busy || !connected ? formStyles.disabled : {}) }}
+                    style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
                     disabled={busy || !connected}
                     onClick={() => void handleCreate()}
                 >
@@ -140,13 +222,10 @@ export function CreateAuction({ connected, opnosis, onCreated }: Props) {
             )}
 
             {txState.status !== 'idle' && (
-                <div style={formStyles.status(txState.status === 'error')}>
+                <div style={statusMsg(txState.status === 'error')}>
                     {txState.message}
                     {(txState.status === 'success' || txState.status === 'error') && (
-                        <button
-                            style={{ marginLeft: '12px', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', textDecoration: 'underline' }}
-                            onClick={resetTx}
-                        >dismiss</button>
+                        <button style={dismissBtn} onClick={resetTx}>dismiss</button>
                     )}
                 </div>
             )}

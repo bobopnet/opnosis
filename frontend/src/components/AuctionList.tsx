@@ -1,24 +1,65 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount } from '@opnosis/shared';
+import { color, font, card, badge as badgeStyle } from '../styles.js';
 import type { IndexedAuction } from '../types.js';
 
-const styles = {
-    grid: { display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' } as const,
+const s = {
+    grid: {
+        display: 'grid',
+        gap: '16px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    } as React.CSSProperties,
     card: {
-        background: '#1e1e2e', borderRadius: '12px', padding: '20px',
-        border: '1px solid #2d2d3f', cursor: 'pointer', transition: 'border-color 0.2s',
-    } as const,
-    badge: (status: string) => ({
-        display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-        background: status === 'open' ? '#065f46' : status === 'settled' ? '#6366f1' : '#92400e',
-        color: '#fff',
-    }) as const,
-    label: { color: '#9ca3af', fontSize: '12px', marginTop: '8px' } as const,
-    value: { color: '#e2e8f0', fontSize: '14px' } as const,
-    empty: { color: '#6b7280', textAlign: 'center' as const, padding: '40px' },
-    loading: { color: '#9ca3af', textAlign: 'center' as const, padding: '40px' },
+        ...card,
+        cursor: 'pointer',
+    } as React.CSSProperties,
+    cardHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px',
+    } as React.CSSProperties,
+    cardTitle: {
+        fontFamily: font.display,
+        fontWeight: 700,
+        fontSize: '16px',
+        color: color.textPrimary,
+    } as React.CSSProperties,
+    label: {
+        color: color.textMuted,
+        fontSize: '11px',
+        fontFamily: font.body,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.05em',
+        marginTop: '10px',
+    } as React.CSSProperties,
+    value: {
+        color: color.textPrimary,
+        fontSize: '14px',
+        fontFamily: font.body,
+        fontWeight: 500,
+    } as React.CSSProperties,
+    empty: {
+        color: color.textMuted,
+        textAlign: 'center' as const,
+        padding: '48px 24px',
+        fontFamily: font.body,
+        fontSize: '15px',
+    } as React.CSSProperties,
+    loading: {
+        color: color.textSecondary,
+        textAlign: 'center' as const,
+        padding: '48px 24px',
+        fontFamily: font.body,
+    } as React.CSSProperties,
 };
+
+function statusBadge(status: string): React.CSSProperties {
+    if (status === 'open') return badgeStyle('amber');
+    if (status === 'settled') return badgeStyle('success');
+    return badgeStyle('muted');
+}
 
 interface Props {
     readonly onSelect: (id: string) => void;
@@ -28,6 +69,7 @@ interface Props {
 export function AuctionList({ onSelect, refreshKey }: Props) {
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -47,25 +89,40 @@ export function AuctionList({ onSelect, refreshKey }: Props) {
         return () => { cancelled = true; };
     }, [refreshKey]);
 
-    if (loading) return <div style={styles.loading}>Loading auctions...</div>;
-    if (auctions.length === 0) return <div style={styles.empty}>No auctions found</div>;
+    if (loading) return <div style={s.loading}>Loading auctions...</div>;
+    if (auctions.length === 0) return <div style={s.empty}>No auctions found</div>;
 
     return (
-        <div style={styles.grid}>
-            {auctions.map((a) => (
-                <div key={a.id} style={styles.card} onClick={() => onSelect(a.id)}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 600, color: '#fff' }}>Auction #{a.id}</span>
-                        <span style={styles.badge(a.status)}>{a.status}</span>
+        <div style={s.grid}>
+            {auctions.map((a) => {
+                const isHovered = hoveredId === a.id;
+                return (
+                    <div
+                        key={a.id}
+                        style={{
+                            ...s.card,
+                            ...(isHovered ? {
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 8px 24px rgba(232, 148, 26, 0.12)',
+                            } : {}),
+                        }}
+                        onClick={() => onSelect(a.id)}
+                        onMouseEnter={() => setHoveredId(a.id)}
+                        onMouseLeave={() => setHoveredId(null)}
+                    >
+                        <div style={s.cardHeader}>
+                            <span style={s.cardTitle}>Auction #{a.id}</span>
+                            <span style={statusBadge(a.status)}>{a.status}</span>
+                        </div>
+                        <div style={s.label}>Sell Amount</div>
+                        <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount))}</div>
+                        <div style={s.label}>Min Buy Amount</div>
+                        <div style={s.value}>{formatTokenAmount(BigInt(a.minBuyAmount))}</div>
+                        <div style={s.label}>Orders</div>
+                        <div style={s.value}>{a.orderCount} / 100</div>
                     </div>
-                    <div style={styles.label}>Sell Amount</div>
-                    <div style={styles.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount))}</div>
-                    <div style={styles.label}>Min Buy Amount</div>
-                    <div style={styles.value}>{formatTokenAmount(BigInt(a.minBuyAmount))}</div>
-                    <div style={styles.label}>Orders</div>
-                    <div style={styles.value}>{a.orderCount} / 100</div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }

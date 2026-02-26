@@ -5,14 +5,55 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" type="image/svg+xml" href="/opnosis-avatar.svg" />
         <title>Opnosis Auction — Batch Auctions on Bitcoin</title>
+
+        <!-- Google Fonts: Space Grotesk (display) + IBM Plex Sans (body) -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+
         <style>
+            :root {
+                --bg-deep: #0a0a12;
+                --bg-surface: #141420;
+                --bg-elevated: #1e1e2e;
+                --border-subtle: #2a2a3d;
+                --border-strong: #3d3450;
+
+                --amber: #e8941a;
+                --amber-light: #f5b044;
+                --amber-dim: #b37215;
+                --purple: #6b2d7b;
+                --purple-light: #9b4dbb;
+                --purple-deep: #3d1a4a;
+
+                --text-primary: #f0ece4;
+                --text-secondary: #a09b90;
+                --text-muted: #6b6560;
+
+                --success: #10b981;
+                --error: #ef4444;
+                --warning: #f59e0b;
+            }
             *, *::before, *::after { box-sizing: border-box; }
             body {
                 margin: 0; padding: 0;
-                font-family: 'Inter', system-ui, -apple-system, sans-serif;
-                background: #0a0a1a; color: #e2e8f0;
+                font-family: 'IBM Plex Sans', sans-serif;
+                background: var(--bg-deep); color: var(--text-primary);
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
             }
             select, input, textarea, button { font-family: inherit; }
+            ::selection { background: rgba(232, 148, 26, 0.3); color: #fff; }
+
+            /* Scrollbar styling */
+            ::-webkit-scrollbar { width: 8px; }
+            ::-webkit-scrollbar-track { background: var(--bg-deep); }
+            ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background: var(--purple); }
+
+            /* Focus ring for keyboard navigation */
+            :focus-visible { outline: 2px solid var(--purple-light); outline-offset: 2px; }
+            button:focus:not(:focus-visible), select:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
         </style>
     </head>
     <body>

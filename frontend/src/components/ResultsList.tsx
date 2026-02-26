@@ -1,24 +1,77 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount, formatPrice } from '@opnosis/shared';
+import { color, font, card, badge as badgeStyle } from '../styles.js';
 import type { IndexedAuction, IndexedClearing } from '../types.js';
 
-const styles = {
-    grid: { display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' } as const,
+const s = {
+    grid: {
+        display: 'grid',
+        gap: '16px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    } as React.CSSProperties,
     card: {
-        background: '#1e1e2e', borderRadius: '12px', padding: '20px',
-        border: '1px solid #2d2d3f',
-    } as const,
-    cardTitle: { fontWeight: 600, color: '#fff', marginBottom: '12px', fontSize: '16px' } as const,
-    row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } as const,
-    label: { color: '#9ca3af', fontSize: '12px' } as const,
-    value: { color: '#e2e8f0', fontSize: '14px', textAlign: 'right' as const } as const,
-    badge: {
-        display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-        background: '#6366f1', color: '#fff',
-    } as const,
-    empty: { color: '#6b7280', textAlign: 'center' as const, padding: '40px' },
-    loading: { color: '#9ca3af', textAlign: 'center' as const, padding: '40px' },
+        ...card,
+    } as React.CSSProperties,
+    cardHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px',
+    } as React.CSSProperties,
+    cardTitle: {
+        fontFamily: font.display,
+        fontWeight: 700,
+        fontSize: '16px',
+        color: color.textPrimary,
+    } as React.CSSProperties,
+    priceLabel: {
+        color: color.textMuted,
+        fontSize: '11px',
+        fontFamily: font.body,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.05em',
+        marginTop: '4px',
+    } as React.CSSProperties,
+    priceValue: {
+        fontFamily: font.display,
+        fontSize: '24px',
+        fontWeight: 700,
+        color: color.amber,
+        lineHeight: 1.2,
+        marginBottom: '12px',
+    } as React.CSSProperties,
+    row: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '6px',
+    } as React.CSSProperties,
+    label: {
+        color: color.textMuted,
+        fontSize: '12px',
+        fontFamily: font.body,
+    } as React.CSSProperties,
+    value: {
+        color: color.textSecondary,
+        fontSize: '14px',
+        fontFamily: font.body,
+        fontWeight: 500,
+        textAlign: 'right' as const,
+    } as React.CSSProperties,
+    empty: {
+        color: color.textMuted,
+        textAlign: 'center' as const,
+        padding: '48px 24px',
+        fontFamily: font.body,
+        fontSize: '15px',
+    } as React.CSSProperties,
+    loading: {
+        color: color.textSecondary,
+        textAlign: 'center' as const,
+        padding: '48px 24px',
+        fontFamily: font.body,
+    } as React.CSSProperties,
 };
 
 interface AuctionWithClearing {
@@ -63,11 +116,11 @@ export function ResultsList() {
         return () => { cancelled = true; };
     }, []);
 
-    if (loading) return <div style={styles.loading}>Loading results...</div>;
-    if (results.length === 0) return <div style={styles.empty}>No settled auctions yet</div>;
+    if (loading) return <div style={s.loading}>Loading results...</div>;
+    if (results.length === 0) return <div style={s.empty}>No settled auctions yet</div>;
 
     return (
-        <div style={styles.grid}>
+        <div style={s.grid}>
             {results.map(({ auction, clearing }) => {
                 const clearingPrice = clearing
                     ? formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))
@@ -77,26 +130,24 @@ export function ResultsList() {
                     : '--';
 
                 return (
-                    <div key={auction.id} style={styles.card}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                            <span style={styles.cardTitle}>Auction #{auction.id}</span>
-                            <span style={styles.badge}>Settled</span>
+                    <div key={auction.id} style={s.card}>
+                        <div style={s.cardHeader}>
+                            <span style={s.cardTitle}>Auction #{auction.id}</span>
+                            <span style={badgeStyle('success')}>Settled</span>
                         </div>
-                        <div style={styles.row}>
-                            <span style={styles.label}>Clearing Price</span>
-                            <span style={styles.value}>{clearingPrice}</span>
+                        <div style={s.priceLabel}>Clearing Price</div>
+                        <div style={s.priceValue}>{clearingPrice}</div>
+                        <div style={s.row}>
+                            <span style={s.label}>Volume Raised</span>
+                            <span style={s.value}>{volumeRaised}</span>
                         </div>
-                        <div style={styles.row}>
-                            <span style={styles.label}>Volume Raised</span>
-                            <span style={styles.value}>{volumeRaised}</span>
+                        <div style={s.row}>
+                            <span style={s.label}>Orders Filled</span>
+                            <span style={s.value}>{auction.orderCount} / 100</span>
                         </div>
-                        <div style={styles.row}>
-                            <span style={styles.label}>Orders Filled</span>
-                            <span style={styles.value}>{auction.orderCount} / 100</span>
-                        </div>
-                        <div style={styles.row}>
-                            <span style={styles.label}>Sell Amount</span>
-                            <span style={styles.value}>{formatTokenAmount(BigInt(auction.auctionedSellAmount))}</span>
+                        <div style={s.row}>
+                            <span style={s.label}>Sell Amount</span>
+                            <span style={s.value}>{formatTokenAmount(BigInt(auction.auctionedSellAmount))}</span>
                         </div>
                     </div>
                 );
