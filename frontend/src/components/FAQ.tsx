@@ -156,7 +156,7 @@ const sections: Section[] = [
             {
                 q: 'Who can use Opnosis Auction \u2014 is it only for institutions?',
                 a: <>
-                    Opnosis is permissionless software. Anyone with an OP_WALLET &mdash; retail users, projects, DAOs, or institutions &mdash; can create auctions and place bids. There are no KYC requirements, minimum balances, or whitelists.
+                    Opnosis Auction is permissionless software. Anyone with an OP_WALLET &mdash; retail users, projects, DAOs, or institutions &mdash; can create auctions and place bids. There are no KYC requirements, minimum balances, or whitelists.
                     <br /><br />
                     <strong>However</strong>, cryptocurrency laws vary significantly by jurisdiction. Token auctions may be restricted or prohibited in certain countries, including those under international sanctions (e.g., OFAC-sanctioned regions such as North Korea, Iran, Cuba, Syria, and Crimea) and countries that have banned cryptocurrency activity (e.g., China, Algeria, Bangladesh, Nepal, and others). It is <strong>your sole responsibility</strong> to determine whether using this platform is lawful in your jurisdiction. When in doubt, consult a legal professional.
                 </>,
@@ -171,7 +171,7 @@ const sections: Section[] = [
             },
             {
                 q: 'What wallets are supported?',
-                a: 'Opnosis exclusively supports OP_WALLET, the browser extension wallet for the OPNet ecosystem. MetaMask and other Ethereum wallets are not compatible.',
+                a: 'Opnosis Auction exclusively supports OP_WALLET, the browser extension wallet for the OPNet ecosystem. MetaMask and other Ethereum wallets are not compatible.',
             },
             {
                 q: 'What tokens can I use?',
@@ -202,7 +202,7 @@ const sections: Section[] = [
             },
             {
                 q: 'What is the protocol fee?',
-                a: 'Opnosis charges a small fee on the sell amount, deducted automatically at settlement. The exact percentage is displayed on the Create page. No fee is charged if the auction fails to meet its funding threshold.',
+                a: 'Opnosis Auction charges a small fee on the sell amount, deducted automatically at settlement. The exact percentage is displayed on the Create page. No fee is charged if the auction fails to meet its funding threshold.',
             },
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
@@ -240,12 +240,12 @@ const sections: Section[] = [
         items: [
             {
                 q: 'What network does Opnosis run on?',
-                a: 'Opnosis runs on OPNet, a smart-contract layer on Bitcoin Layer 1. Transactions are secured by Bitcoin\u2019s proof-of-work consensus. The platform supports both testnet and mainnet.',
+                a: 'Opnosis Auction runs on OPNet, a smart-contract layer on Bitcoin Layer 1. Transactions are secured by Bitcoin\u2019s proof-of-work consensus. The platform supports both testnet and mainnet.',
             },
             {
                 q: 'Is the smart contract open source?',
                 a: <>
-                    Yes. The entire Opnosis codebase &mdash; smart contracts, frontend, and backend &mdash; is publicly available on{' '}
+                    Yes. The entire Opnosis Auction codebase &mdash; smart contracts, frontend, and backend &mdash; is publicly available on{' '}
                     <a
                         href="https://github.com/bobopnet/opnosis"
                         target="_blank"
@@ -262,20 +262,20 @@ const sections: Section[] = [
         title: 'Legal',
         items: [
             {
-                q: 'Is Opnosis available in my country?',
+                q: 'Is Opnosis Auction available in my country?',
                 a: <>
-                    Opnosis is permissionless software deployed on a public blockchain. However, laws governing digital assets and token sales vary widely by jurisdiction and change frequently.
+                    Opnosis Auction is permissionless software deployed on a public blockchain. However, laws governing digital assets and token sales vary widely by jurisdiction and change frequently.
                     <br /><br />
                     Users from <strong>OFAC-sanctioned regions</strong> (including but not limited to North Korea, Iran, Cuba, Syria, Crimea, and others on the U.S. sanctions list) are prohibited from using the platform.
                     <br /><br />
                     Additionally, several countries have <strong>banned or heavily restricted</strong> cryptocurrency activity, including China, Algeria, Bangladesh, Nepal, Morocco, Egypt, Tunisia, and others. This list is not exhaustive and regulations evolve.
                     <br /><br />
-                    <strong>You are solely responsible for determining whether using Opnosis is lawful in your jurisdiction.</strong> If you are unsure, please consult a qualified legal professional before participating.
+                    <strong>You are solely responsible for determining whether using Opnosis Auction is lawful in your jurisdiction.</strong> If you are unsure, please consult a qualified legal professional before participating.
                 </>,
             },
             {
                 q: 'Is this financial or investment advice?',
-                a: 'No. Opnosis is software infrastructure, not a financial service. Nothing on this platform constitutes financial, investment, tax, or legal advice. Token auctions involve substantial risk, including the risk of total loss. You should do your own research and consult qualified professionals before making any financial decisions.',
+                a: 'No. Opnosis Auction is software infrastructure, not a financial service. Nothing on this platform constitutes financial, investment, tax, or legal advice. Token auctions involve substantial risk, including the risk of total loss. You should do your own research and consult qualified professionals before making any financial decisions.',
             },
             {
                 q: 'What are the risks?',
