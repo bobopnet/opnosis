@@ -18,53 +18,43 @@ import { OPNOSIS_ABI } from './abi.js';
 export type SimResult = any;
 
 interface OpnosisMethods {
-    readonly initiateAuction: {
-        simulate: (
-            auctioningToken: string,
-            biddingToken: string,
-            cancellationEndDate: bigint,
-            auctionEndDate: bigint,
-            auctionedSellAmount: bigint,
-            minBuyAmount: bigint,
-            minimumBiddingAmountPerOrder: bigint,
-            minFundingThreshold: bigint,
-            isAtomicClosureAllowed: boolean,
-        ) => Promise<SimResult>;
-    };
-    readonly placeSellOrders: {
-        simulate: (
-            auctionId: bigint,
-            minBuyAmounts: readonly bigint[],
-            sellAmounts: readonly bigint[],
-        ) => Promise<SimResult>;
-    };
-    readonly cancelSellOrders: {
-        simulate: (auctionId: bigint, orderIds: readonly bigint[]) => Promise<SimResult>;
-    };
-    readonly precalculateSellAmountSum: {
-        simulate: (auctionId: bigint, iterationSteps: bigint) => Promise<SimResult>;
-    };
-    readonly settleAuction: {
-        simulate: (auctionId: bigint) => Promise<SimResult>;
-    };
-    readonly claimFromParticipantOrder: {
-        simulate: (auctionId: bigint, orderIds: readonly bigint[]) => Promise<SimResult>;
-    };
-    readonly setFeeParameters: {
-        simulate: (feeNumerator: bigint, feeReceiver: string) => Promise<SimResult>;
-    };
-    readonly getUserId: {
-        simulate: (userAddress: string) => Promise<SimResult>;
-    };
-    readonly getAuctionData: {
-        simulate: (auctionId: bigint) => Promise<SimResult>;
-    };
-    readonly getClearingOrder: {
-        simulate: (auctionId: bigint) => Promise<SimResult>;
-    };
-    readonly getFeeParameters: {
-        simulate: () => Promise<SimResult>;
-    };
+    readonly initiateAuction: (
+        auctioningToken: string,
+        biddingToken: string,
+        cancellationEndDate: bigint,
+        auctionEndDate: bigint,
+        auctionedSellAmount: bigint,
+        minBuyAmount: bigint,
+        minimumBiddingAmountPerOrder: bigint,
+        minFundingThreshold: bigint,
+        isAtomicClosureAllowed: boolean,
+    ) => Promise<SimResult>;
+    readonly placeSellOrders: (
+        auctionId: bigint,
+        minBuyAmounts: readonly bigint[],
+        sellAmounts: readonly bigint[],
+    ) => Promise<SimResult>;
+    readonly cancelSellOrders: (
+        auctionId: bigint,
+        orderIds: readonly bigint[],
+    ) => Promise<SimResult>;
+    readonly precalculateSellAmountSum: (
+        auctionId: bigint,
+        iterationSteps: bigint,
+    ) => Promise<SimResult>;
+    readonly settleAuction: (auctionId: bigint) => Promise<SimResult>;
+    readonly claimFromParticipantOrder: (
+        auctionId: bigint,
+        orderIds: readonly bigint[],
+    ) => Promise<SimResult>;
+    readonly setFeeParameters: (
+        feeNumerator: bigint,
+        feeReceiver: string,
+    ) => Promise<SimResult>;
+    readonly getUserId: (userAddress: string) => Promise<SimResult>;
+    readonly getAuctionData: (auctionId: bigint) => Promise<SimResult>;
+    readonly getClearingOrder: (auctionId: bigint) => Promise<SimResult>;
+    readonly getFeeParameters: () => Promise<SimResult>;
 }
 
 // ─── Class ────────────────────────────────────────────────────────────────────
@@ -119,7 +109,7 @@ export class OpnosisContract {
         minFundingThreshold: bigint,
         isAtomicClosureAllowed: boolean,
     ): Promise<SimResult> {
-        return this.#contract.initiateAuction.simulate(
+        return this.#contract.initiateAuction(
             auctioningToken,
             biddingToken,
             cancellationEndDate,
@@ -137,62 +127,62 @@ export class OpnosisContract {
         minBuyAmounts: readonly bigint[],
         sellAmounts: readonly bigint[],
     ): Promise<SimResult> {
-        return this.#contract.placeSellOrders.simulate(auctionId, minBuyAmounts, sellAmounts);
+        return this.#contract.placeSellOrders(auctionId, minBuyAmounts, sellAmounts);
     }
 
     public async simulateCancelSellOrders(
         auctionId: bigint,
         orderIds: readonly bigint[],
     ): Promise<SimResult> {
-        return this.#contract.cancelSellOrders.simulate(auctionId, orderIds);
+        return this.#contract.cancelSellOrders(auctionId, orderIds);
     }
 
     public async simulatePrecalculate(
         auctionId: bigint,
         iterationSteps: bigint,
     ): Promise<SimResult> {
-        return this.#contract.precalculateSellAmountSum.simulate(auctionId, iterationSteps);
+        return this.#contract.precalculateSellAmountSum(auctionId, iterationSteps);
     }
 
     public async simulateSettle(auctionId: bigint): Promise<SimResult> {
-        return this.#contract.settleAuction.simulate(auctionId);
+        return this.#contract.settleAuction(auctionId);
     }
 
     public async simulateClaimFromParticipantOrder(
         auctionId: bigint,
         orderIds: readonly bigint[],
     ): Promise<SimResult> {
-        return this.#contract.claimFromParticipantOrder.simulate(auctionId, orderIds);
+        return this.#contract.claimFromParticipantOrder(auctionId, orderIds);
     }
 
     public async simulateSetFeeParameters(
         feeNumerator: bigint,
         feeReceiver: string,
     ): Promise<SimResult> {
-        return this.#contract.setFeeParameters.simulate(feeNumerator, feeReceiver);
+        return this.#contract.setFeeParameters(feeNumerator, feeReceiver);
     }
 
     // ── Read methods (return parsed data) ─────────────────────────────────────
 
     public async getUserId(userAddress: string): Promise<bigint> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const result: SimResult = await this.#contract.getUserId.simulate(userAddress);
+        const result: SimResult = await this.#contract.getUserId(userAddress);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        return (result?.result?.userId as bigint | undefined) ?? 0n;
+        return (result?.properties?.userId as bigint | undefined) ?? 0n;
     }
 
     public async getAuctionData(auctionId: bigint): Promise<SimResult> {
-        return this.#contract.getAuctionData.simulate(auctionId);
+        return this.#contract.getAuctionData(auctionId);
     }
 
     public async getClearingOrder(auctionId: bigint): Promise<SimResult> {
-        return this.#contract.getClearingOrder.simulate(auctionId);
+        return this.#contract.getClearingOrder(auctionId);
     }
 
     public async getFeeParameters(): Promise<{ feeNumerator: bigint }> {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const result: SimResult = await this.#contract.getFeeParameters.simulate();
+        const result: SimResult = await this.#contract.getFeeParameters();
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        return { feeNumerator: (result?.result?.feeNumerator as bigint | undefined) ?? 0n };
+        return { feeNumerator: (result?.properties?.feeNumerator as bigint | undefined) ?? 0n };
     }
 }

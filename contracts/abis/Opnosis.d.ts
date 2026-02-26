@@ -130,6 +130,18 @@ export type GetUserId = CallResult<
 export type GetAuctionData = CallResult<
     {
         auctioningToken: Address;
+        biddingToken: Address;
+        cancellationEndDate: bigint;
+        auctionEndDate: bigint;
+        auctionedSellAmount: bigint;
+        minBuyAmount: bigint;
+        minimumBiddingAmountPerOrder: bigint;
+        feeNumerator: bigint;
+        minFundingThreshold: bigint;
+        isAtomicClosureAllowed: boolean;
+        orderCount: bigint;
+        isSettled: boolean;
+        fundingNotReached: boolean;
     },
     OPNetEvent<never>[]
 >;
@@ -140,6 +152,10 @@ export type GetAuctionData = CallResult<
 export type GetClearingOrder = CallResult<
     {
         clearingBuyAmount: bigint;
+        clearingSellAmount: bigint;
+        volumeClearingPriceOrder: bigint;
+        bidRaised: bigint;
+        clearingOrderId: bigint;
     },
     OPNetEvent<never>[]
 >;

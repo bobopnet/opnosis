@@ -14,12 +14,12 @@ export interface NetworkConfig {
 export const NETWORK_CONFIGS: Record<string, NetworkConfig> = {
     testnet: {
         name: 'testnet',
-        rpcUrl: 'https://testnet.opnet.org/v1/json-rpc',
+        rpcUrl: 'https://testnet.opnet.org',
         btcNetwork: networks.opnetTestnet,
     },
     mainnet: {
         name: 'mainnet',
-        rpcUrl: 'https://mainnet.opnet.org/v1/json-rpc',
+        rpcUrl: 'https://mainnet.opnet.org',
         btcNetwork: networks.bitcoin,
     },
 };

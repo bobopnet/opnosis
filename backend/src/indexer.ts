@@ -43,8 +43,9 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function parseAuctionResult(auctionId: number, raw: any): IndexedAuction | null {
     try {
+        // The opnet SDK decodes outputs into `properties` (not `result`)
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        const r = raw?.result;
+        const r = raw?.properties;
         if (!r) return null;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const auctioningToken = String(r.auctioningToken ?? '');
@@ -188,7 +189,7 @@ export async function getClearingData(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const raw = await contract.getClearingOrder(BigInt(auctionId));
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        const r = raw?.result;
+        const r = raw?.properties;
         if (!r) return null;
         const data: IndexedClearing = {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access

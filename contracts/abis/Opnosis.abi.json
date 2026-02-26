@@ -212,10 +212,19 @@
                 }
             ],
             "outputs": [
-                {
-                    "name": "auctioningToken",
-                    "type": "ADDRESS"
-                }
+                { "name": "auctioningToken", "type": "ADDRESS" },
+                { "name": "biddingToken", "type": "ADDRESS" },
+                { "name": "cancellationEndDate", "type": "UINT256" },
+                { "name": "auctionEndDate", "type": "UINT256" },
+                { "name": "auctionedSellAmount", "type": "UINT256" },
+                { "name": "minBuyAmount", "type": "UINT256" },
+                { "name": "minimumBiddingAmountPerOrder", "type": "UINT256" },
+                { "name": "feeNumerator", "type": "UINT256" },
+                { "name": "minFundingThreshold", "type": "UINT256" },
+                { "name": "isAtomicClosureAllowed", "type": "BOOL" },
+                { "name": "orderCount", "type": "UINT256" },
+                { "name": "isSettled", "type": "BOOL" },
+                { "name": "fundingNotReached", "type": "BOOL" }
             ]
         },
         {
@@ -230,10 +239,11 @@
                 }
             ],
             "outputs": [
-                {
-                    "name": "clearingBuyAmount",
-                    "type": "UINT256"
-                }
+                { "name": "clearingBuyAmount", "type": "UINT256" },
+                { "name": "clearingSellAmount", "type": "UINT256" },
+                { "name": "volumeClearingPriceOrder", "type": "UINT256" },
+                { "name": "bidRaised", "type": "UINT256" },
+                { "name": "clearingOrderId", "type": "UINT256" }
             ]
         },
         {
