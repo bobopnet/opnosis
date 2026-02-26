@@ -1,3 +1,4 @@
+import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -8,7 +9,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
-            '@opnosis/shared': '../shared/src/index.ts',
+            '@opnosis/shared': path.resolve(__dirname, '../shared/src/index.ts'),
         },
     },
 });

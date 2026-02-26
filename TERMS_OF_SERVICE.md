@@ -1,14 +1,14 @@
-# OPNosis — Terms of Service
+# Opnosis Auction — Terms of Service
 
 **Last Updated: February 26, 2026**
 
-These Terms of Service ("Terms") govern your access to and use of the OPNosis protocol interface ("Interface"), including any associated software, tools, and documentation (collectively, the "Service"). By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
+These Terms of Service ("Terms") govern your access to and use of the Opnosis Auction protocol interface ("Interface"), including any associated software, tools, and documentation (collectively, the "Service"). By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.
 
 ---
 
 ## 1. Overview
 
-OPNosis is a decentralized batch auction protocol deployed on Bitcoin Layer 1 via the OP_NET virtual machine. The Interface is a web-based frontend that allows users to interact with the OPNosis smart contract. The Interface does not custody funds, execute trades, or control the underlying protocol.
+Opnosis Auction is a decentralized batch auction protocol deployed on Bitcoin Layer 1 via the OP_NET virtual machine. The Interface is a web-based frontend that allows users to interact with the Opnosis Auction smart contract. The Interface does not custody funds, execute trades, or control the underlying protocol.
 
 ## 2. Eligibility
 
@@ -24,7 +24,7 @@ By using the Service, you represent and warrant that:
 
 ### 3.1 Protocol vs. Interface
 
-The OPNosis protocol consists of smart contracts deployed on the OP_NET network on Bitcoin Layer 1. The protocol is autonomous, permissionless, and not controlled by any single party once deployed. The Interface is merely a convenience tool that facilitates interaction with the protocol. You may interact with the protocol through other means, including direct contract calls.
+The Opnosis Auction protocol consists of smart contracts deployed on the OP_NET network on Bitcoin Layer 1. The protocol is autonomous, permissionless, and not controlled by any single party once deployed. The Interface is merely a convenience tool that facilitates interaction with the protocol. You may interact with the protocol through other means, including direct contract calls.
 
 ### 3.2 Non-Custodial
 
@@ -47,7 +47,7 @@ To use the Service, you must connect a compatible OP_WALLET browser extension. B
 
 ### 5.1 Creating Auctions
 
-When you create an auction through the Interface, you are initiating an on-chain transaction that deploys auction parameters to the OPNosis smart contract. Once submitted and confirmed on-chain, auction parameters cannot be modified through the Interface.
+When you create an auction through the Interface, you are initiating an on-chain transaction that deploys auction parameters to the Opnosis Auction smart contract. Once submitted and confirmed on-chain, auction parameters cannot be modified through the Interface.
 
 ### 5.2 Placing Bids
 
@@ -59,7 +59,7 @@ Auction settlement and token claims are executed by the smart contract according
 
 ### 5.4 Fees
 
-The OPNosis protocol may charge fees on auction settlement as encoded in the smart contract. Fee parameters are visible through the Interface and on-chain. The Interface does not charge any additional fees.
+The Opnosis Auction protocol may charge fees on auction settlement as encoded in the smart contract. Fee parameters are visible through the Interface and on-chain. The Interface does not charge any additional fees.
 
 ## 6. Prohibited Uses
 
@@ -79,7 +79,7 @@ You acknowledge and accept the following risks associated with using the Service
 
 ### 7.1 Smart Contract Risk
 
-The OPNosis smart contract may contain bugs, vulnerabilities, or unintended behavior. While the code has been reviewed, no audit can guarantee the absence of all defects. You may lose some or all of your funds due to smart contract failures.
+The Opnosis Auction smart contract may contain bugs, vulnerabilities, or unintended behavior. While the code has been reviewed, no audit can guarantee the absence of all defects. You may lose some or all of your funds due to smart contract failures.
 
 ### 7.2 Blockchain Risk
 
@@ -99,7 +99,7 @@ The Interface may be unavailable due to maintenance, technical issues, or other 
 
 ## 8. Intellectual Property
 
-The Interface source code, design, and documentation are provided under the terms of their respective licenses. The OPNosis name and branding are proprietary. You may not use the OPNosis name or branding to imply endorsement or affiliation without prior written consent.
+The Interface source code, design, and documentation are provided under the terms of their respective licenses. The Opnosis Auction name and branding are proprietary. You may not use the Opnosis Auction name or branding to imply endorsement or affiliation without prior written consent.
 
 ## 9. Disclaimer of Warranties
 
@@ -115,7 +115,7 @@ IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU FOR ALL CLAIMS ARISING OUT OF OR RE
 
 ## 11. Indemnification
 
-You agree to indemnify, defend, and hold harmless the OPNosis contributors, developers, and affiliates from and against any claims, liabilities, damages, losses, and expenses (including reasonable legal fees) arising out of or in connection with:
+You agree to indemnify, defend, and hold harmless the Opnosis Auction contributors, developers, and affiliates from and against any claims, liabilities, damages, losses, and expenses (including reasonable legal fees) arising out of or in connection with:
 
 - Your use of the Service.
 - Your violation of these Terms.
@@ -136,4 +136,4 @@ These Terms shall be governed by and construed in accordance with applicable law
 
 ## 15. Contact
 
-For questions about these Terms, you may open an issue on the OPNosis project repository or contact the development team through the channels listed in the project documentation.
+For questions about these Terms, you may open an issue on the Opnosis Auction project repository or contact the development team through the channels listed in the project documentation.

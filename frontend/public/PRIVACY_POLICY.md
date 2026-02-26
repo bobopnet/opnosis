@@ -1,14 +1,14 @@
-# OPNosis — Privacy Policy
+# Opnosis Auction — Privacy Policy
 
 **Last Updated: February 26, 2026**
 
-This Privacy Policy describes how the OPNosis Interface ("Interface", "Service") handles information when you use the web-based frontend to interact with the OPNosis batch auction protocol on Bitcoin Layer 1 via OP_NET.
+This Privacy Policy describes how the Opnosis Auction Interface ("Interface", "Service") handles information when you use the web-based frontend to interact with the Opnosis Auction batch auction protocol on Bitcoin Layer 1 via OP_NET.
 
 ---
 
 ## 1. Our Approach to Privacy
 
-OPNosis is designed to minimize data collection. The Interface is a static web application that communicates directly with the OP_NET blockchain and a read-only backend indexer. We do not require account creation, email addresses, or personal identification to use the Service.
+Opnosis Auction is designed to minimize data collection. The Interface is a static web application that communicates directly with the OP_NET blockchain and a read-only backend indexer. We do not require account creation, email addresses, or personal identification to use the Service.
 
 ## 2. Information We Do NOT Collect
 
@@ -22,7 +22,7 @@ The Interface does **not** collect, store, or process:
 
 ## 3. Information Visible on the Blockchain
 
-When you interact with the OPNosis smart contract through the Interface (or by any other means), certain information is recorded on the Bitcoin blockchain and the OP_NET network. This includes:
+When you interact with the Opnosis Auction smart contract through the Interface (or by any other means), certain information is recorded on the Bitcoin blockchain and the OP_NET network. This includes:
 
 - **Wallet addresses** — Your public wallet address is recorded with every on-chain transaction you initiate, including auction creation, bid placement, settlement, and claims.
 - **Transaction details** — Bid amounts, order parameters, and auction interactions are recorded permanently on-chain.
@@ -32,7 +32,7 @@ When you interact with the OPNosis smart contract through the Interface (or by a
 
 ## 4. Backend Indexer Data
 
-The OPNosis backend server indexes publicly available on-chain auction data to provide a faster browsing experience. Specifically, the backend:
+The Opnosis Auction backend server indexes publicly available on-chain auction data to provide a faster browsing experience. Specifically, the backend:
 
 - Reads auction data, order counts, and settlement status from the OP_NET blockchain via a JSON-RPC provider.
 - Caches this public blockchain data temporarily in memory to reduce redundant RPC calls.
@@ -95,7 +95,7 @@ The Service is not directed at individuals under the age of 18. We do not knowin
 
 ## 11. International Users
 
-The OPNosis protocol and Interface are accessible globally. By using the Service, you acknowledge that blockchain data is stored on a decentralized network without geographic boundaries. There is no central server location, and on-chain data is replicated across all network nodes worldwide.
+The Opnosis Auction protocol and Interface are accessible globally. By using the Service, you acknowledge that blockchain data is stored on a decentralized network without geographic boundaries. There is no central server location, and on-chain data is replicated across all network nodes worldwide.
 
 ## 12. Your Rights
 
@@ -113,4 +113,4 @@ We may update this Privacy Policy from time to time. Changes will be indicated b
 
 ## 14. Contact
 
-For questions about this Privacy Policy, you may open an issue on the OPNosis project repository or contact the development team through the channels listed in the project documentation.
+For questions about this Privacy Policy, you may open an issue on the Opnosis Auction project repository or contact the development team through the channels listed in the project documentation.

@@ -1,6 +1,6 @@
-# OPNosis
+# Opnosis Auction
 
-A Bitcoin-native batch auction platform built on [OPNet](https://opnet.org) (Bitcoin Layer 1). OPNosis is a faithful port of [Gnosis EasyAuction](https://github.com/gnosis/ido-contracts) to OPNet, implementing a uniform-price batch auction mechanism where all winning bidders pay the same clearing price.
+A Bitcoin-native batch auction platform built on [OPNet](https://opnet.org) (Bitcoin Layer 1). Opnosis Auction is a faithful port of [Gnosis EasyAuction](https://github.com/gnosis/ido-contracts) to OPNet, implementing a uniform-price batch auction mechanism where all winning bidders pay the same clearing price.
 
 ## How It Works
 

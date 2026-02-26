@@ -79,9 +79,12 @@ export function App() {
     return (
         <div style={styles.container}>
             <div style={styles.header}>
-                <div>
-                    <div style={styles.title}>Opnosis</div>
-                    <div style={{ color: '#6366f1', fontSize: '12px' }}>Batch Auctions on Bitcoin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <img src="/opnosis-avatar.svg" alt="Opnosis Auction" style={{ width: '44px', height: '44px' }} />
+                    <div>
+                        <div style={styles.title}>Opnosis Auction</div>
+                        <div style={{ color: '#6366f1', fontSize: '12px' }}>Batch Auctions on Bitcoin</div>
+                    </div>
                 </div>
                 <div>
                     {wallet.connected ? (
@@ -146,6 +149,10 @@ export function App() {
                 />
             )}
             <footer style={styles.footer}>
+                <a href="https://github.com/bobopnet/opnosis" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>GitHub</a>
+                <span style={{ color: '#374151' }}>|</span>
+                <a href="https://t.me/+_oC6gbqZGyo0YzU1" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Telegram</a>
+                <span style={{ color: '#374151' }}>|</span>
                 <a href="/TERMS_OF_SERVICE.md" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Terms of Service</a>
                 <span style={{ color: '#374151' }}>|</span>
                 <a href="/PRIVACY_POLICY.md" target="_blank" rel="noopener noreferrer" style={styles.footerLink}>Privacy Policy</a>

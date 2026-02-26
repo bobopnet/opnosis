@@ -1,5 +1,5 @@
 /**
- * Opnosis Backend — hyper-express API server.
+ * Opnosis Auction Backend — hyper-express API server.
  *
  * Routes:
  *   GET  /health                -> { status, network, contract }
@@ -151,7 +151,7 @@ app.get('/fee-parameters', async (_req, res) => {
 // -- Start ---------------------------------------------------------------------
 
 await app.listen(config.port);
-console.log(`Opnosis backend running on port ${config.port}`);
+console.log(`Opnosis Auction backend running on port ${config.port}`);
 console.log(`  Network : ${config.network}`);
 console.log(`  Contract: ${config.contractAddress}`);
 console.log(`  Indexer : polling every ${config.indexerPollMs}ms`);
