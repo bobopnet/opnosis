@@ -1,0 +1,19 @@
+{
+    "name": "@opnosis/shared",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "./src/index.ts",
+    "scripts": {
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@btc-vision/bip32": "^7.1.2",
+        "@btc-vision/bitcoin": "^7.0.0-rc.6",
+        "@btc-vision/ecpair": "^4.0.5",
+        "@btc-vision/transaction": "^1.8.0-rc.9",
+        "opnet": "^1.8.1-rc.14"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.3"
+    }
+}

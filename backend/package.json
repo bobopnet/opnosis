@@ -1,0 +1,27 @@
+{
+    "name": "@opnosis/backend",
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "start": "node dist/index.js",
+        "build": "tsc",
+        "dev": "tsx src/index.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@btc-vision/bip32": "^7.1.2",
+        "@btc-vision/bitcoin": "^7.0.0-rc.6",
+        "@btc-vision/ecpair": "^4.0.5",
+        "@btc-vision/hyper-express": "latest",
+        "@btc-vision/transaction": "^1.8.0-rc.9",
+        "@btc-vision/uwebsockets.js": "latest",
+        "@opnosis/shared": "file:../shared",
+        "dotenv": "^17.3.1",
+        "opnet": "^1.8.1-rc.14"
+    },
+    "devDependencies": {
+        "@types/node": "^25.3.0",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
+    }
+}

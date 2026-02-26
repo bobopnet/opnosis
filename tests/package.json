@@ -1,0 +1,24 @@
+{
+    "name": "@opnosis/tests",
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "test": "tsx --test src/**/*.test.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@btc-vision/bip32": "^7.1.2",
+        "@btc-vision/bitcoin": "^7.0.0-rc.6",
+        "@btc-vision/ecpair": "^4.0.5",
+        "@btc-vision/op-vm": "^1.0.0-rc.1",
+        "@btc-vision/transaction": "^1.8.0-rc.9",
+        "@btc-vision/unit-test-framework": "^1.0.0-beta.0",
+        "@opnosis/shared": "file:../shared",
+        "opnet": "^1.8.1-rc.14"
+    },
+    "devDependencies": {
+        "@types/node": "^25.3.0",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.3"
+    }
+}

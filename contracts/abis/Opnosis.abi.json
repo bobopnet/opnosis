@@ -1,0 +1,383 @@
+{
+    "functions": [
+        {
+            "name": "initiateAuction",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctioningToken",
+                    "type": "ADDRESS"
+                },
+                {
+                    "name": "biddingToken",
+                    "type": "ADDRESS"
+                },
+                {
+                    "name": "cancellationEndDate",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "auctionEndDate",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "auctionedSellAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "minBuyAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "minimumBiddingAmountPerOrder",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "minFundingThreshold",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "isAtomicClosureAllowed",
+                    "type": "BOOL"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "placeSellOrders",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "minBuyAmounts",
+                    "type": "ARRAY_OF_UINT256"
+                },
+                {
+                    "name": "sellAmounts",
+                    "type": "ARRAY_OF_UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "cancelSellOrders",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "orderIds",
+                    "type": "ARRAY_OF_UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "precalculateSellAmountSum",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "iterationSteps",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "clearingFound",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "settleAuction",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "clearingBuyAmount",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "claimFromParticipantOrder",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "orderIds",
+                    "type": "ARRAY_OF_UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "totalAuctioning",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "setFeeParameters",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "feeNumerator",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "feeReceiver",
+                    "type": "ADDRESS"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
+            "name": "getUserId",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "userAddress",
+                    "type": "ADDRESS"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "userId",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "getAuctionData",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "auctioningToken",
+                    "type": "ADDRESS"
+                }
+            ]
+        },
+        {
+            "name": "getClearingOrder",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "clearingBuyAmount",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "getFeeParameters",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "feeNumerator",
+                    "type": "UINT256"
+                }
+            ]
+        }
+    ],
+    "events": [
+        {
+            "name": "NewAuction",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "auctioningToken",
+                    "type": "ADDRESS"
+                },
+                {
+                    "name": "biddingToken",
+                    "type": "ADDRESS"
+                },
+                {
+                    "name": "auctioneerUserId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "auctionedSellAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "minBuyAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "NewSellOrder",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "userId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "buyAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "sellAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "CancellationSellOrder",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "userId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "buyAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "sellAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "AuctionCleared",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "clearingBuyAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "clearingSellAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "ClaimedFromOrder",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "userId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "auctioningAmount",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "biddingAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "FeeParametersUpdated",
+            "values": [
+                {
+                    "name": "feeNumerator",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "feeReceiver",
+                    "type": "ADDRESS"
+                }
+            ],
+            "type": "Event"
+        }
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "name": "@opnosis/contracts",
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "build": "asc src/opnosis/index.ts --target opnosis --measure --uncheckedBehavior never",
+        "format": "prettier --write .",
+        "lint": "eslint . --fix"
+    },
+    "dependencies": {
+        "@assemblyscript/loader": "^0.28.9",
+        "@btc-vision/as-bignum": "^0.1.2",
+        "@btc-vision/btc-runtime": "^1.11.0-rc.10",
+        "@btc-vision/opnet-transform": "^1.2.0",
+        "@noble/hashes": "2.0.1"
+    },
+    "devDependencies": {
+        "@btc-vision/assemblyscript": "^0.29.2",
+        "@eslint/js": "^10.0.1",
+        "eslint": "^10.0.2",
+        "prettier": "^3.8.1",
+        "typescript-eslint": "^8.56.1"
+    }
+}
