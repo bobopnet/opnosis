@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useWallet } from './hooks/useWallet.js';
 import { useOpnosis } from './hooks/useOpnosis.js';
 import { AuctionList } from './components/AuctionList.js';
+import { MyBids } from './components/MyBids.js';
 import { ResultsList } from './components/ResultsList.js';
 import { CreateAuction } from './components/CreateAuction.js';
 import { FAQ } from './components/FAQ.js';
@@ -9,7 +10,7 @@ import { API_BASE_URL } from './constants.js';
 import { color, font, btnPrimary, btnSecondary } from './styles.js';
 import type { AuctionStats } from './types.js';
 
-type Tab = 'main' | 'browse' | 'results' | 'create' | 'faq';
+type Tab = 'main' | 'browse' | 'mybids' | 'results' | 'create' | 'faq';
 
 /* ── Inline styles ────────────────────────────────────────────────── */
 
@@ -303,6 +304,7 @@ export function App() {
                 <nav style={s.nav}>
                     <button style={s.navLink(tab === 'main')} onClick={() => setTab('main')}>Main</button>
                     <button style={s.navLink(tab === 'browse')} onClick={() => setTab('browse')}>Browse</button>
+                    <button style={s.navLink(tab === 'mybids')} onClick={() => setTab('mybids')}>My Bids</button>
                     <button style={s.navLink(tab === 'results')} onClick={() => setTab('results')}>Results</button>
                     <button style={s.navLink(tab === 'create')} onClick={() => setTab('create')}>Create</button>
                     <button style={s.navLink(tab === 'faq')} onClick={() => setTab('faq')}>FAQ</button>
@@ -373,6 +375,7 @@ export function App() {
                 {/* Tab content */}
                 <div ref={auctionsRef} style={s.content}>
                     {tab === 'browse' && <AuctionList connected={wallet.connected} walletAddress={wallet.address} opnosis={opnosis} refreshKey={refreshKey} />}
+                    {tab === 'mybids' && <MyBids connected={wallet.connected} walletAddress={wallet.address} opnosis={opnosis} />}
                     {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (
                         <CreateAuction
