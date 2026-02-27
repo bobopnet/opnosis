@@ -27,6 +27,7 @@ export interface IndexedAuction {
     readonly minFundingThreshold: string;
     readonly isAtomicClosureAllowed: boolean;
     readonly orderCount: string;
+    readonly totalBidAmount: string;
     readonly isSettled: boolean;
     readonly status: AuctionStatus;
     readonly auctioneerAddress: string;
@@ -170,6 +171,7 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
             isAtomicClosureAllowed: Boolean(r.isAtomicClosureAllowed ?? false),
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             orderCount: String(r.orderCount ?? '0'),
+            totalBidAmount: '0',
             isSettled,
             status,
             auctioneerAddress,
@@ -238,6 +240,25 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
             }
         } catch (err) {
             console.warn(`Indexer: error fetching clearing for auction ${id}:`, err);
+        }
+    }
+
+    // Compute totalBidAmount for auctions with orders
+    for (const [id, auction] of auctions) {
+        if (auction.totalBidAmount !== '0' && auction.isSettled) continue; // settled totals are frozen
+        const orderCount = Number(auction.orderCount);
+        if (orderCount === 0) continue;
+        try {
+            const orders = await getOrdersData(contract, cache, id);
+            if (orders) {
+                let total = 0n;
+                for (const o of orders) {
+                    if (!o.cancelled) total += BigInt(o.sellAmount);
+                }
+                auctions.set(id, { ...auction, totalBidAmount: total.toString() });
+            }
+        } catch {
+            // totalBidAmount stays at previous value
         }
     }
 }
@@ -326,6 +347,72 @@ export async function getStats(): Promise<AuctionStats> {
         totalRaisedUsd: totalRaisedUsd.toFixed(2),
         totalOrdersPlaced,
     };
+}
+
+export interface IndexedOrder {
+    readonly orderId: number;
+    readonly buyAmount: string;
+    readonly sellAmount: string;
+    readonly userId: string;
+    readonly userAddress: string;
+    readonly cancelled: boolean;
+    readonly claimed: boolean;
+}
+
+export async function getOrdersData(
+    contract: OpnosisContract,
+    cache: Cache,
+    auctionId: number,
+): Promise<IndexedOrder[] | null> {
+    const cacheKey = `orders:${auctionId}`;
+    const cached = cache.get<IndexedOrder[]>(cacheKey);
+    if (cached) return cached;
+
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const raw = await contract.getAuctionOrders(BigInt(auctionId));
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        const reader = raw?.result;
+        if (!reader) return null;
+
+        // First u256 = orderCount
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const orderCount = Number(reader.readU256() as bigint);
+
+        const orders: IndexedOrder[] = [];
+        const userAddressCache = new Map<string, string>();
+
+        for (let i = 0; i < orderCount; i++) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const buyAmount = String(reader.readU256() as bigint);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const sellAmount = String(reader.readU256() as bigint);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const userId = String(reader.readU256() as bigint);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const cancelled = reader.readBoolean() as boolean;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const claimed = reader.readBoolean() as boolean;
+
+            // Resolve userId → address (cache to avoid repeated RPC calls)
+            let userAddress = userAddressCache.get(userId);
+            if (userAddress === undefined) {
+                try {
+                    userAddress = await contract.getUserAddress(BigInt(userId));
+                } catch {
+                    userAddress = '';
+                }
+                userAddressCache.set(userId, userAddress);
+            }
+
+            orders.push({ orderId: i, buyAmount, sellAmount, userId, userAddress, cancelled, claimed });
+        }
+
+        cache.set(cacheKey, orders);
+        return orders;
+    } catch {
+        return null;
+    }
 }
 
 export async function getClearingData(

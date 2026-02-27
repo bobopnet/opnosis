@@ -121,6 +121,20 @@ export const OPNOSIS_ABI: BitcoinInterfaceAbi = [
         type: BitcoinAbiTypes.Function,
     },
     {
+        name: 'getAuctionOrders',
+        constant: true,
+        inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'orderCount', type: ABIDataTypes.UINT256 }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
+        name: 'getUserAddress',
+        constant: true,
+        inputs: [{ name: 'userId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'userAddress', type: ABIDataTypes.ADDRESS }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'getFeeParameters',
         constant: true,
         inputs: [],

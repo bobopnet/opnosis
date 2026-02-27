@@ -160,6 +160,26 @@ export type GetClearingOrder = CallResult<
 >;
 
 /**
+ * @description Represents the result of the getAuctionOrders function call.
+ */
+export type GetAuctionOrders = CallResult<
+    {
+        orderCount: bigint;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
+ * @description Represents the result of the getUserAddress function call.
+ */
+export type GetUserAddress = CallResult<
+    {
+        userAddress: Address;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the getFeeParameters function call.
  */
 export type GetFeeParameters = CallResult<
@@ -195,5 +215,7 @@ export interface IOpnosis extends IOP_NETContract {
     getUserId(userAddress: Address): Promise<GetUserId>;
     getAuctionData(auctionId: bigint): Promise<GetAuctionData>;
     getClearingOrder(auctionId: bigint): Promise<GetClearingOrder>;
+    getAuctionOrders(auctionId: bigint): Promise<GetAuctionOrders>;
+    getUserAddress(userId: bigint): Promise<GetUserAddress>;
     getFeeParameters(): Promise<GetFeeParameters>;
 }

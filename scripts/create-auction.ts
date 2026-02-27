@@ -79,8 +79,8 @@ if (orngeBalance <= 0n) {
 
 const auctioningToken = orngeHex;
 const biddingToken = MOTO;
-// Auction 10M ORNGE (10,000,000 * 10^8)
-const auctionedSellAmount = 10_000_000_00000000n;
+// Auction 500K ORNGE (500,000 * 10^8)
+const auctionedSellAmount = 500_000_00000000n;
 
 console.log(`\nAuctioning: ORNGE`);
 console.log(`Bidding   : MOTO`);
@@ -161,7 +161,7 @@ const cancellationEndDate = now + 43_200_000n;  // 12 hours from now
 const auctionEndDate = now + 86_400_000n;       // 1 day from now
 const minBuyAmount = auctionedSellAmount / 10n; // 10:1 minimum price
 const minimumBiddingAmountPerOrder = 1_00000000n; // 1 token minimum bid
-const minFundingThreshold = 200_000_00000000n; // 200K MOTO minimum funding
+const minFundingThreshold = 10_000_00000000n; // 10K MOTO minimum funding
 const isAtomicClosureAllowed = true;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

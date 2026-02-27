@@ -117,7 +117,8 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [auctioningToken, setAuctioningToken] = useState('');
     const [biddingToken, setBiddingToken] = useState('');
     const [sellAmount, setSellAmount] = useState('0');
-    const [reservePriceUsd, setReservePriceUsd] = useState('');
+    const [reservePriceUsd, setReservePriceUsd] = useState('0');
+    const [minReceiveBidding, setMinReceiveBidding] = useState('0');
     const [minBidPerOrder, setMinBidPerOrder] = useState('0');
     const [minFunding, setMinFunding] = useState('0');
     const [startMode, setStartMode] = useState<'now' | 'schedule'>('now');
@@ -156,13 +157,38 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         (network === 'mainnet' ? t.mainnet : t.testnet) === biddingToken,
     )?.symbol ?? '';
 
-    // Compute minBuyAmount in bidding tokens from USD reserve price
-    const computedMinBuyTokens = (() => {
-        const price = parseFloat(reservePriceUsd);
+    const canCompute = biddingTokenUsdPrice !== null && biddingTokenUsdPrice > 0;
+
+    const onReservePriceChange = (val: string) => {
+        setReservePriceUsd(val);
+        if (!canCompute) return;
+        const price = parseFloat(val);
         const sell = parseFloat(sellAmount);
-        if (!price || !sell || price <= 0 || sell <= 0 || biddingTokenUsdPrice === null || biddingTokenUsdPrice <= 0) return null;
-        return (price * sell) / biddingTokenUsdPrice;
-    })();
+        if (price > 0 && sell > 0) {
+            setMinReceiveBidding(((price * sell) / biddingTokenUsdPrice!).toFixed(8).replace(/\.?0+$/, ''));
+        }
+    };
+
+    const onMinReceiveChange = (val: string) => {
+        setMinReceiveBidding(val);
+        if (!canCompute) return;
+        const minRcv = parseFloat(val);
+        const sell = parseFloat(sellAmount);
+        if (minRcv > 0 && sell > 0) {
+            setReservePriceUsd(((minRcv * biddingTokenUsdPrice!) / sell).toFixed(8).replace(/\.?0+$/, ''));
+        }
+    };
+
+    const onSellAmountChange = (val: string) => {
+        setSellAmount(val);
+        // Recompute min receive from existing reserve price
+        if (!canCompute) return;
+        const price = parseFloat(reservePriceUsd);
+        const sell = parseFloat(val);
+        if (price > 0 && sell > 0) {
+            setMinReceiveBidding(((price * sell) / biddingTokenUsdPrice!).toFixed(8).replace(/\.?0+$/, ''));
+        }
+    };
 
     const { txState, resetTx, createAuction, approveToken } = opnosis;
 
@@ -192,7 +218,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             cancellationEndDate: baseTime + cancelSec,
             auctionEndDate: baseTime + auctionSec,
             auctionedSellAmount: parseTokenAmount(sellAmount),
-            minBuyAmount: computedMinBuyTokens !== null ? parseTokenAmount(computedMinBuyTokens.toFixed(8)) : 0n,
+            minBuyAmount: parseTokenAmount(minReceiveBidding || '0'),
             minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0'),
             minFundingThreshold: parseTokenAmount(minFunding),
             isAtomicClosureAllowed: atomicClose,
@@ -238,26 +264,11 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Total Auctioned Tokens{auctioningTokenSymbol ? ` (${auctioningTokenSymbol})` : ''}<HelpTip text="The total number of tokens to be distributed to winning bidders." /></label>
-                    <input style={inputStyle} value={sellAmount} onChange={(e) => setSellAmount(e.target.value)} placeholder="100.0" />
+                    <label style={labelStyle}>Total Auction Tokens{auctioningTokenSymbol ? ` (${auctioningTokenSymbol})` : ''}<HelpTip text="The total number of tokens to be distributed to winning bidders." /></label>
+                    <input style={inputStyle} value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value)} placeholder="100.0" />
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Reserve Price per Token (USD)<HelpTip text="The lowest USD price per token you are willing to accept. Bids below this price will not be filled. The equivalent amount in bidding tokens is calculated automatically." /></label>
-                    <input style={inputStyle} value={reservePriceUsd} onChange={(e) => setReservePriceUsd(e.target.value)} placeholder="0.05" />
-                    {computedMinBuyTokens !== null && (
-                        <span style={{ color: color.textMuted, fontSize: '13px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>
-                            = {computedMinBuyTokens.toFixed(4)} {biddingTokenSymbol} total min buy
-                        </span>
-                    )}
-                </div>
-            </div>
-            <div style={s.row}>
-                <div style={s.field}>
-                    <label style={labelStyle}>Min Bid Per Order{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum amount of bidding tokens a single bid must contain. Prevents spam and dust bids. Set to 0 to allow any amount." /></label>
-                    <input style={inputStyle} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
-                </div>
-                <div style={s.field}>
-                    <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If total bids fall below this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 to disable." /></label>
+                    <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If the total bid amount does not reach this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 for no minimum — the auction will succeed regardless of how much is raised." /></label>
                     <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
                     {(() => {
                         const val = parseFloat(minFunding);
@@ -266,26 +277,47 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     })()}
                 </div>
             </div>
-            <div style={s.field}>
-                <label style={labelStyle}>Start Mode<HelpTip text="Controls when bidders can begin placing bids. 'Start Now' opens bidding as soon as the auction is created. 'Schedule Start' delays bidding until a specific date and time." /></label>
-                <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
-                    <label style={s.checkbox}>
-                        <input type="radio" name="startMode" checked={startMode === 'now'} onChange={() => setStartMode('now')} />
-                        Start Now
-                    </label>
-                    <label style={s.checkbox}>
-                        <input type="radio" name="startMode" checked={startMode === 'schedule'} onChange={() => setStartMode('schedule')} />
-                        Schedule Start
-                    </label>
+            <div style={s.row}>
+                <div style={s.field}>
+                    <label style={labelStyle}>Reserve Price (USD) per Token<HelpTip text="The lowest USD price per token you are willing to accept. Bids below this price will not be filled. The equivalent amount in bidding tokens is calculated automatically." /></label>
+                    <input style={inputStyle} value={reservePriceUsd} onChange={(e) => onReservePriceChange(e.target.value)} placeholder="0" />
                 </div>
-                {startMode === 'schedule' && (
-                    <input
-                        style={{ ...inputStyle, colorScheme: 'dark' }}
-                        type="datetime-local"
-                        value={scheduledStart}
-                        onChange={(e) => setScheduledStart(e.target.value)}
-                    />
-                )}
+                <div style={s.field}>
+                    <label style={labelStyle}>Min Receive{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ' (bidding token)'}<HelpTip text="The minimum total bidding tokens you will receive if all auction tokens are sold. Auto-calculated from Total Auction Tokens and Reserve Price, or enter directly to set the reserve price." /></label>
+                    <input style={inputStyle} value={minReceiveBidding} onChange={(e) => onMinReceiveChange(e.target.value)} placeholder="0" />
+                    {biddingTokenUsdPrice === null && biddingToken && (
+                        <span style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>
+                            USD price unavailable — enter min receive directly.
+                        </span>
+                    )}
+                </div>
+            </div>
+            <div style={s.row}>
+                <div style={s.field}>
+                    <label style={labelStyle}>Start Mode<HelpTip text="Controls when bidders can begin placing bids. 'Start Now' opens bidding as soon as the auction is created. 'Schedule Start' delays bidding until a specific date and time." /></label>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                        <label style={s.checkbox}>
+                            <input type="radio" name="startMode" checked={startMode === 'now'} onChange={() => setStartMode('now')} />
+                            Start Now
+                        </label>
+                        <label style={s.checkbox}>
+                            <input type="radio" name="startMode" checked={startMode === 'schedule'} onChange={() => setStartMode('schedule')} />
+                            Schedule Start
+                        </label>
+                    </div>
+                    {startMode === 'schedule' && (
+                        <input
+                            style={{ ...inputStyle, colorScheme: 'dark' }}
+                            type="datetime-local"
+                            value={scheduledStart}
+                            onChange={(e) => setScheduledStart(e.target.value)}
+                        />
+                    )}
+                </div>
+                <div style={s.field}>
+                    <label style={labelStyle}>Min Bid Per Order{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum amount of bidding tokens a single bid must contain. Prevents spam and dust bids. Set to 0 to allow any amount." /></label>
+                    <input style={inputStyle} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
+                </div>
             </div>
             <div style={s.row}>
                 <div style={s.field}>

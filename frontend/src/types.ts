@@ -28,6 +28,17 @@ export interface IndexedClearing {
     readonly clearingSellAmount: string;
 }
 
+/** API response type for an individual order within an auction. */
+export interface IndexedOrder {
+    readonly orderId: number;
+    readonly buyAmount: string;
+    readonly sellAmount: string;
+    readonly userId: string;
+    readonly userAddress: string;
+    readonly cancelled: boolean;
+    readonly claimed: boolean;
+}
+
 /** API response type for indexed auctions (all values are strings/booleans). */
 export interface IndexedAuction {
     readonly id: string;
@@ -46,6 +57,7 @@ export interface IndexedAuction {
     readonly minFundingThreshold: string;
     readonly isAtomicClosureAllowed: boolean;
     readonly orderCount: string;
+    readonly totalBidAmount: string;
     readonly isSettled: boolean;
     readonly status: AuctionStatus;
     readonly auctioneerAddress: string;

@@ -15,7 +15,7 @@ import HyperExpress from '@btc-vision/hyper-express';
 import { OpnosisContract, getNetworkConfig } from '@opnosis/shared';
 import { config, provider } from './config.js';
 import { Cache } from './cache.js';
-import { startIndexer, getAuctions, getAuction, getClearingData, getStats } from './indexer.js';
+import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats } from './indexer.js';
 import { getTokenUsdPrice } from './pricefeed.js';
 
 const networkConfig = getNetworkConfig(config.network);
@@ -124,6 +124,27 @@ app.get('/auctions/:id', (req, res) => {
         return;
     }
     res.json(auction);
+});
+
+// -- GET /auctions/:id/orders --------------------------------------------------
+
+app.get('/auctions/:id/orders', async (req, res) => {
+    const id = parseInt(req.path_parameters?.['id'] ?? '', 10);
+    if (isNaN(id) || id < 1) {
+        res.status(400).json({ error: 'Invalid auction ID' });
+        return;
+    }
+    const auction = getAuction(id);
+    if (!auction) {
+        res.status(404).json({ error: 'Auction not found' });
+        return;
+    }
+    const orders = await getOrdersData(contract, cache, id);
+    if (!orders) {
+        res.status(500).json({ error: 'Failed to fetch orders' });
+        return;
+    }
+    res.json(orders);
 });
 
 // -- GET /auctions/:id/clearing ------------------------------------------------

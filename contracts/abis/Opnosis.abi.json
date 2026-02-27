@@ -267,6 +267,42 @@
             ]
         },
         {
+            "name": "getAuctionOrders",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "orderCount",
+                    "type": "UINT256"
+                }
+            ]
+        },
+        {
+            "name": "getUserAddress",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "userId",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "userAddress",
+                    "type": "ADDRESS"
+                }
+            ]
+        },
+        {
             "name": "getFeeParameters",
             "type": "Function",
             "payable": false,

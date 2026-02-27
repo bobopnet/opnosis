@@ -172,7 +172,7 @@ function isBetterOrder(aSell: u256, aBuy: u256, bSell: u256, bBuy: u256): bool {
  * Returns true if a bidder order meets the auctioneer's minimum price floor.
  * A bidder order (buyAmt auctioning, sellAmt bidding) is valid when:
  *   sellAmt / buyAmt  ≥  minBuyAmountBidding / auctionedSellAmount
- * Cross-multiplied: sellAmt * minBuyAmountBidding >= auctionedSellAmount * buyAmt
+ * Cross-multiplied: sellAmt * auctionedSellAmount >= minBuyAmountBidding * buyAmt
  * Falls back to ratio comparison when either product would overflow.
  */
 @inline
@@ -183,8 +183,8 @@ function meetsMinPrice(
     auctionedSellAmount: u256,
 ): bool {
     if (
-        mulWouldOverflow(bidderSell, minBuyAmountBidding) ||
-        mulWouldOverflow(auctionedSellAmount, bidderBuy)
+        mulWouldOverflow(bidderSell, auctionedSellAmount) ||
+        mulWouldOverflow(minBuyAmountBidding, bidderBuy)
     ) {
         // Fall back to ratio comparison (bidderBuy and auctionedSellAmount are > 0 after validation).
         return (
@@ -193,8 +193,8 @@ function meetsMinPrice(
         );
     }
     return (
-        SafeMath.mul(bidderSell, minBuyAmountBidding) >=
-        SafeMath.mul(auctionedSellAmount, bidderBuy)
+        SafeMath.mul(bidderSell, auctionedSellAmount) >=
+        SafeMath.mul(minBuyAmountBidding, bidderBuy)
     );
 }
 
@@ -1504,6 +1504,51 @@ export class Opnosis extends OP_NET {
         response.writeU256(this.mapVolumeClearing.get(auctionId));
         response.writeU256(this.mapBidRaised.get(auctionId));
         response.writeU256(this.mapClearingOrderId.get(auctionId));
+        return response;
+    }
+
+    /**
+     * Return all orders for an auction.
+     * Response layout: orderCount (u256), then per order:
+     *   buyAmount (u256) + sellAmount (u256) + userId (u256) + cancelled (bool) + claimed (bool)
+     * Loop bounded by MAX_ORDERS (100). Pure reads — no lock needed.
+     */
+    @method({ name: 'auctionId', type: ABIDataTypes.UINT256 })
+    @returns({ name: 'orderCount', type: ABIDataTypes.UINT256 })
+    public getAuctionOrders(calldata: Calldata): BytesWriter {
+        const auctionId = calldata.readU256();
+
+        if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
+            throw new Revert('Opnosis: auction does not exist');
+        }
+
+        const count = this.mapOrderCount.get(auctionId);
+        const countU32 = u256ToU32(count);
+        const perOrder = U256_BYTE_LENGTH * 3 + BOOLEAN_BYTE_LENGTH * 2;
+        const response = new BytesWriter(U256_BYTE_LENGTH + perOrder * countU32);
+        response.writeU256(count);
+
+        for (let i: u32 = 0; i < countU32; i++) {
+            const key = orderKey(auctionId, u256.fromU32(i));
+            response.writeU256(this.mapOrderBuy.get(key));
+            response.writeU256(this.mapOrderSell.get(key));
+            response.writeU256(this.mapOrderUser.get(key));
+            response.writeBoolean(!u256.eq(this.mapOrderCancelled.get(key), u256.Zero));
+            response.writeBoolean(!u256.eq(this.mapClaimed.get(key), u256.Zero));
+        }
+
+        return response;
+    }
+
+    /**
+     * Return the address for a given userId.
+     */
+    @method({ name: 'userId', type: ABIDataTypes.UINT256 })
+    @returns({ name: 'userAddress', type: ABIDataTypes.ADDRESS })
+    public getUserAddress(calldata: Calldata): BytesWriter {
+        const userId = calldata.readU256();
+        const response = new BytesWriter(ADDRESS_BYTE_LENGTH);
+        response.writeAddress(u256ToAddr(this.mapUserIdToAddr.get(userId)));
         return response;
     }
 

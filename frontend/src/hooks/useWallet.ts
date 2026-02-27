@@ -29,6 +29,7 @@ export interface UseWalletReturn {
 const DISCONNECTED: WalletState = {
     connected: false,
     address: '',
+    publicKey: '',
     network: '',
 };
 
@@ -61,10 +62,20 @@ export function useWallet(): UseWalletReturn {
             console.log(`OP_WALLET network: ${rawNetwork} → ${normalisedNetwork}`);
             const rpcProvider = new JSONRpcProvider({ url: rpcUrl, network: btcNetwork });
 
+            // Fetch original 33-byte classical public key from OP_WALLET.
+            // Needed to derive CSV addresses for spending timelocked UTXOs.
+            let publicKey = '';
+            try {
+                publicKey = await window.opnet.getPublicKey();
+            } catch {
+                // Wallet may not support getPublicKey — fall back gracefully
+            }
+
             setProvider(rpcProvider);
             setWallet({
                 connected: true,
                 address: accounts[0] ?? '',
+                publicKey,
                 network: normalisedNetwork,
             });
         } catch (err) {

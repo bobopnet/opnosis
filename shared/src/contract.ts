@@ -60,6 +60,8 @@ interface OpnosisMethods {
     readonly getUserId: (userAddress: string) => Promise<SimResult>;
     readonly getAuctionData: (auctionId: bigint) => Promise<SimResult>;
     readonly getClearingOrder: (auctionId: bigint) => Promise<SimResult>;
+    readonly getAuctionOrders: (auctionId: bigint) => Promise<SimResult>;
+    readonly getUserAddress: (userId: bigint) => Promise<SimResult>;
     readonly getFeeParameters: () => Promise<SimResult>;
 }
 
@@ -193,6 +195,17 @@ export class OpnosisContract {
 
     public async getClearingOrder(auctionId: bigint): Promise<SimResult> {
         return this.#contract.getClearingOrder(auctionId);
+    }
+
+    public async getAuctionOrders(auctionId: bigint): Promise<SimResult> {
+        return this.#contract.getAuctionOrders(auctionId);
+    }
+
+    public async getUserAddress(userId: bigint): Promise<string> {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const result: SimResult = await this.#contract.getUserAddress(userId);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        return String(result?.properties?.userAddress ?? '');
     }
 
     public async getFeeParameters(): Promise<{ feeNumerator: bigint }> {

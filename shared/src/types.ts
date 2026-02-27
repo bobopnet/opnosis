@@ -79,6 +79,7 @@ export type AuctionStatus = 'upcoming' | 'open' | 'cancellation_closed' | 'ended
 export interface WalletState {
     readonly connected: boolean;
     readonly address: string;
+    readonly publicKey: string;
     readonly network: string;
 }
 

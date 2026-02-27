@@ -170,6 +170,18 @@ export const OpnosisAbi = [
         type: BitcoinAbiTypes.Function,
     },
     {
+        name: 'getAuctionOrders',
+        inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'orderCount', type: ABIDataTypes.UINT256 }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
+        name: 'getUserAddress',
+        inputs: [{ name: 'userId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'userAddress', type: ABIDataTypes.ADDRESS }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'getFeeParameters',
         inputs: [],
         outputs: [{ name: 'feeNumerator', type: ABIDataTypes.UINT256 }],

@@ -254,7 +254,7 @@ const s = {
 
 export function App() {
     const { wallet, provider, connect, disconnect, error: walletError } = useWallet();
-    const opnosis = useOpnosis(provider, wallet.network);
+    const opnosis = useOpnosis(provider, wallet.network, wallet.address || undefined, wallet.publicKey || undefined);
     const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
     const auctionsRef = useRef<HTMLDivElement>(null);
