@@ -1,14 +1,61 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: http://ogp.me/ns#">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="icon" type="image/svg+xml" href="/opnosis-avatar.svg" />
         <title>Opnosis Auction — Batch Auctions on Bitcoin</title>
+        <meta name="description" content="Permissionless batch auctions on Bitcoin Layer 1. Fair price discovery where every winner pays the same clearing price. No front-running. No MEV. Powered by OPNet." />
 
-        <!-- Google Fonts: Space Grotesk (display) + IBM Plex Sans (body) -->
+        <!-- Canonical URL -->
+        <link rel="canonical" href="https://opnosis.auction/" />
+
+        <!-- Open Graph -->
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Opnosis Auction" />
+        <meta property="og:title" content="Opnosis Auction — Batch Auctions on Bitcoin" />
+        <meta property="og:description" content="Permissionless batch auctions on Bitcoin Layer 1. Fair price discovery where every winner pays the same clearing price. No front-running. No MEV." />
+        <meta property="og:url" content="https://opnosis.auction/" />
+        <meta property="og:image" content="https://opnosis.auction/og-image.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Opnosis Auction — Batch Auctions on Bitcoin" />
+        <meta name="twitter:description" content="Permissionless batch auctions on Bitcoin L1. Fair price discovery with uniform clearing prices. Powered by OPNet." />
+        <meta name="twitter:image" content="https://opnosis.auction/og-image.png" />
+
+        <!-- Favicons -->
+        <link rel="icon" href="/favicon.ico" sizes="32x32" />
+        <link rel="icon" type="image/svg+xml" href="/opnosis-avatar.svg" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+        <!-- PWA Manifest & Theme -->
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#0a0a12" />
+
+        <!-- JSON-LD Structured Data -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "Opnosis Auction",
+            "url": "https://opnosis.auction",
+            "description": "Permissionless batch auctions on Bitcoin Layer 1 with fair uniform clearing prices. Powered by OPNet.",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Any",
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            }
+        }
+        </script>
+
+        <!-- Preconnect hints -->
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preconnect" href="https://testnet.opnet.org" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
 
         <style>

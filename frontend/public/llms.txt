@@ -1,0 +1,39 @@
+# Opnosis Auction
+
+> Permissionless batch auctions on Bitcoin Layer 1, powered by OPNet.
+
+## What is Opnosis Auction?
+
+Opnosis Auction is a decentralized batch auction platform built on Bitcoin L1 using the OPNet protocol. It enables fair price discovery for token sales where every winning bidder pays the same clearing price. The system is fully on-chain, permissionless, and resistant to front-running and MEV.
+
+## Key Features
+
+- **Batch Auctions**: All bids are collected, then settled at a single uniform clearing price.
+- **Fair Pricing**: Every winner pays the same price — no advantage to early or large bidders.
+- **Front-Running Resistant**: Sealed-bid mechanism prevents order sniping and sandwich attacks.
+- **Bitcoin Native**: Built on Bitcoin Layer 1 via OPNet smart contracts (AssemblyScript → WebAssembly).
+- **Permissionless**: Anyone can create an auction or place a bid with no gatekeeping.
+- **Atomic Closure**: Auctioneers can enable instant settlement once minimum funding is reached.
+- **Open Source**: Full source code available at https://github.com/bobopnet/opnosis
+
+## Pages
+
+- **Main** (`/`): Landing page with hero, features, and live stats.
+- **Browse**: List of active and upcoming auctions with bid placement.
+- **My Bids**: View and manage your bids across all auctions.
+- **Results**: Settled auctions with clearing prices and claim status.
+- **Create**: Create a new batch auction (requires OP_WALLET).
+- **FAQ**: Frequently asked questions for auctioneers and bidders.
+
+## Technical Details
+
+- Smart contract: AssemblyScript compiled to WebAssembly, deployed on OPNet (Bitcoin L1)
+- Frontend: React SPA with OP_WALLET integration
+- Backend: hyper-express API for auction data indexing
+- Protocol fee: 0.3%
+
+## Links
+
+- Website: https://opnosis.auction
+- GitHub: https://github.com/bobopnet/opnosis
+- Telegram: https://t.me/+_oC6gbqZGyo0YzU1

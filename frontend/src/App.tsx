@@ -285,7 +285,7 @@ export function App() {
         <div style={s.page}>
             <img src="/opnosis-avatar.svg" alt="" style={s.pageBg} />
             {/* ── Header ──────────────────────────────────────── */}
-            <header style={s.header}>
+            <header style={s.header} role="banner">
                 <div style={s.logoArea}>
                     <video
                         src="/opnosis-logo-animated"
@@ -301,7 +301,7 @@ export function App() {
                     </div>
                 </div>
 
-                <nav style={s.nav}>
+                <nav style={s.nav} aria-label="Main navigation">
                     <button style={s.navLink(tab === 'main')} onClick={() => setTab('main')}>Main</button>
                     <button style={s.navLink(tab === 'browse')} onClick={() => setTab('browse')}>Browse</button>
                     <button style={s.navLink(tab === 'mybids')} onClick={() => setTab('mybids')}>My Bids</button>
