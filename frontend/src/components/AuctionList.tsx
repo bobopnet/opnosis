@@ -480,9 +480,9 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
                     ...(isExpanded ? { gridColumn: '1 / -1' } : {}),
                     ...(isHovered && !isExpanded ? {
                         transform: 'translateY(-2px)',
-                        boxShadow: '0 6px 24px rgba(0, 0, 0, 0.3), 4px 6px 24px rgba(155, 77, 187, 0.5), 0 4px 40px rgba(155, 77, 187, 0.3)',
-                        borderRight: '1px solid rgba(181, 104, 212, 0.7)',
-                        borderBottom: '1px solid rgba(181, 104, 212, 0.7)',
+                        boxShadow: '0 0 20px rgba(155, 77, 187, 0.4), 0 0 40px rgba(155, 77, 187, 0.2), inset 0 0 30px rgba(155, 77, 187, 0.1)',
+                        border: '1px solid rgba(181, 104, 212, 0.7)',
+                        background: 'rgba(155, 77, 187, 0.06)',
                     } : {}),
                 }}
                 onClick={() => toggleExpand(a.id)}
