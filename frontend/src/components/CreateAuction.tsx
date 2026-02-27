@@ -41,7 +41,7 @@ const s = {
         fontSize: '13px',
         fontWeight: 700,
         background: active ? color.amber : color.bgElevated,
-        color: active ? color.bgDeep : color.textMuted,
+        color: active ? color.bgDeep : color.textSecondary,
         border: active ? 'none' : `1px solid ${color.borderSubtle}`,
     }),
     stepLine: (done: boolean): React.CSSProperties => ({
@@ -53,7 +53,7 @@ const s = {
     stepLabel: (active: boolean): React.CSSProperties => ({
         fontFamily: font.body,
         fontSize: '14px',
-        color: active ? color.textPrimary : color.textMuted,
+        color: active ? color.textPrimary : color.textSecondary,
         fontWeight: active ? 600 : 400,
     }),
     warningBox: {

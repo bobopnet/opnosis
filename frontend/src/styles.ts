@@ -16,8 +16,8 @@ export const color = {
     amber: '#e8941a',
     amberLight: '#f5b044',
     amberDim: '#b37215',
-    purple: '#6b2d7b',
-    purpleLight: '#9b4dbb',
+    purple: '#804095',
+    purpleLight: '#b568d4',
     purpleDeep: '#3d1a4a',
 
     textPrimary: '#f0ece4',
