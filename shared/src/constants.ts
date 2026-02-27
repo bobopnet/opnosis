@@ -23,14 +23,13 @@ export const MAX_ORDERS = 100;
 /**
  * Fee denominator used by the contract (feeNumerator / FEE_DENOMINATOR).
  *
- * To activate 0.1% protocol fee post-deployment, call:
- *   setFeeParameters(1n, feeReceiverAddress)
- * where 1/1000 = 0.1%.  Fee is deducted from the sell amount at settlement.
+ * Current on-chain fee: 3/1000 = 0.3%.
+ * Fee is deducted from the sell amount at settlement.
  */
 export const FEE_DENOMINATOR = 1_000n;
 
-/** Default fee numerator (0.1% = 1/1000). Set via setFeeParameters after deploy. */
-export const FEE_NUMERATOR = 1n;
+/** Fee numerator (0.3% = 3/1000). Set on-chain via setFeeParameters. */
+export const FEE_NUMERATOR = 3n;
 
 /** Default token decimals for OPNet OP20 tokens. */
 export const TOKEN_DECIMALS = 8;

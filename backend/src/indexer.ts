@@ -38,6 +38,16 @@ export interface IndexedClearing {
     readonly clearingSellAmount: string;
 }
 
+export interface IndexedOrder {
+    readonly orderId: number;
+    readonly buyAmount: string;
+    readonly sellAmount: string;
+    readonly userId: string;
+    readonly userAddress: string;
+    readonly cancelled: boolean;
+    readonly claimed: boolean;
+}
+
 export interface AuctionStats {
     readonly totalAuctions: number;
     readonly settledAuctions: number;
@@ -243,6 +253,19 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
         }
     }
 
+    // Invalidate order cache for settled auctions with unclaimed orders
+    // so claim/cancel state stays fresh.
+    for (const [id, auction] of auctions) {
+        if (!auction.isSettled) continue;
+        const orderCount = Number(auction.orderCount);
+        if (orderCount === 0) continue;
+        const cacheKey = `orders:${id}`;
+        const cached = cache.get<IndexedOrder[]>(cacheKey);
+        if (cached && cached.some((o) => !o.cancelled && !o.claimed)) {
+            cache.invalidate(cacheKey);
+        }
+    }
+
     // Compute totalBidAmount for auctions with orders
     for (const [id, auction] of auctions) {
         if (auction.totalBidAmount !== '0' && auction.isSettled) continue; // settled totals are frozen
@@ -347,16 +370,6 @@ export async function getStats(): Promise<AuctionStats> {
         totalRaisedUsd: totalRaisedUsd.toFixed(2),
         totalOrdersPlaced,
     };
-}
-
-export interface IndexedOrder {
-    readonly orderId: number;
-    readonly buyAmount: string;
-    readonly sellAmount: string;
-    readonly userId: string;
-    readonly userAddress: string;
-    readonly cancelled: boolean;
-    readonly claimed: boolean;
 }
 
 export async function getOrdersData(

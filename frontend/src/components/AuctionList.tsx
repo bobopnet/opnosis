@@ -449,15 +449,15 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             )}
 
-            {/* Settle */}
-            {a.status === 'ended' && (
+            {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open */}
+            {(a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (
                 <div style={s.section}>
-                    <div style={sectionTitleStyle}>Settlement</div>
+                    <div style={sectionTitleStyle}>{a.status === 'ended' ? 'Settlement' : 'Atomic Closure'}</div>
                     <button
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
-                    >{busy ? 'Settling...' : 'Settle Auction'}</button>
+                    >{busy ? 'Settling...' : a.status === 'ended' ? 'Settle Auction' : 'Settle Now'}</button>
                 </div>
             )}
 

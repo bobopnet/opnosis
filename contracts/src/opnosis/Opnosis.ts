@@ -1185,6 +1185,14 @@ export class Opnosis extends OP_NET {
             this.mapBidRaised.set(auctionId, interimSumBid);
             // Volume at clearing = all raised bidding tokens (whole auctionedSellAmount on offer).
             this.mapVolumeClearing.set(auctionId, interimSumBid);
+
+            // CRITICAL: If total bidding exceeds the floor requirement (minBuyAmount),
+            // adjust the clearing sell amount upward so each bidder receives tokens
+            // proportional to their share of total bidding, not at the floor rate.
+            // Without this, sum of claims would exceed auctionedSellAmount.
+            if (interimSumBid > clearingSellAmt) {
+                this.mapClearingSellAmt.set(auctionId, interimSumBid);
+            }
         }
 
         const bidRaised = this.mapBidRaised.get(auctionId);

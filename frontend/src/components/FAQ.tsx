@@ -202,7 +202,7 @@ const sections: Section[] = [
             },
             {
                 q: 'What is the protocol fee?',
-                a: 'Opnosis Auction charges a small fee on the sell amount, deducted automatically at settlement. The exact percentage is displayed on the Create page. No fee is charged if the auction fails to meet its funding threshold.',
+                a: 'Opnosis Auction charges a 0.3% fee on the sell amount, deducted automatically at settlement. The fee is displayed on the Create page. No fee is charged if the auction fails to meet its funding threshold.',
             },
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
@@ -218,6 +218,19 @@ const sections: Section[] = [
                     <strong>Disable it</strong> if you want the auction to run for the full duration, giving all potential bidders time to participate. This maximizes price discovery and is the safer default for most auctions.
                     <br /><br />
                     Note: early settlement is only possible when the min funding threshold has been reached. If bids are below the threshold, the auctioneer must wait for more bids or let the auction run to its end.
+                </>,
+            },
+            {
+                q: 'How do I trigger atomic closure as the auctioneer?',
+                a: <>
+                    If your auction has atomic closure enabled and the minimum funding threshold has been met, you can settle it early from the <strong>Browse</strong> page:
+                    <br /><br />
+                    1. Connect the same wallet that created the auction.<br />
+                    2. Find and expand your auction card.<br />
+                    3. An <strong>Atomic Closure</strong> section will appear with a &ldquo;Settle Now&rdquo; button.<br />
+                    4. Click it and confirm the transaction in your wallet.
+                    <br /><br />
+                    This section is only visible to the auctioneer and only while the auction is still open. Once settled, bidders can claim their tokens from the <strong>My Bids</strong> tab.
                 </>,
             },
             {
