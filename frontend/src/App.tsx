@@ -293,7 +293,14 @@ export function App() {
             {/* ── Header ──────────────────────────────────────── */}
             <header style={s.header}>
                 <div style={s.logoArea}>
-                    <img src="/opnosis-avatar.svg" alt="Opnosis Auction" style={{ width: '48px', height: '48px' }} />
+                    <video
+                        src="/opnosis-logo-animated"
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                    />
                     <div>
                         <div style={s.logoText}>Opnosis Auction</div>
                         <div style={s.logoSub}>Batch Auctions on Bitcoin L1</div>
