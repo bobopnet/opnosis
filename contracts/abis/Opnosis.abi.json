@@ -55,6 +55,32 @@
             ]
         },
         {
+            "name": "extendAuction",
+            "type": "Function",
+            "payable": false,
+            "onlyOwner": false,
+            "inputs": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "newCancellationEndDate",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "newAuctionEndDate",
+                    "type": "UINT256"
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "success",
+                    "type": "BOOL"
+                }
+            ]
+        },
+        {
             "name": "placeSellOrders",
             "type": "Function",
             "payable": false,
@@ -216,20 +242,10 @@
                 }
             ],
             "outputs": [
-                { "name": "auctioningToken", "type": "ADDRESS" },
-                { "name": "biddingToken", "type": "ADDRESS" },
-                { "name": "orderPlacementStartDate", "type": "UINT256" },
-                { "name": "cancellationEndDate", "type": "UINT256" },
-                { "name": "auctionEndDate", "type": "UINT256" },
-                { "name": "auctionedSellAmount", "type": "UINT256" },
-                { "name": "minBuyAmount", "type": "UINT256" },
-                { "name": "minimumBiddingAmountPerOrder", "type": "UINT256" },
-                { "name": "feeNumerator", "type": "UINT256" },
-                { "name": "minFundingThreshold", "type": "UINT256" },
-                { "name": "isAtomicClosureAllowed", "type": "BOOL" },
-                { "name": "orderCount", "type": "UINT256" },
-                { "name": "isSettled", "type": "BOOL" },
-                { "name": "fundingNotReached", "type": "BOOL" }
+                {
+                    "name": "auctioningToken",
+                    "type": "ADDRESS"
+                }
             ]
         },
         {
@@ -244,11 +260,10 @@
                 }
             ],
             "outputs": [
-                { "name": "clearingBuyAmount", "type": "UINT256" },
-                { "name": "clearingSellAmount", "type": "UINT256" },
-                { "name": "volumeClearingPriceOrder", "type": "UINT256" },
-                { "name": "bidRaised", "type": "UINT256" },
-                { "name": "clearingOrderId", "type": "UINT256" }
+                {
+                    "name": "clearingBuyAmount",
+                    "type": "UINT256"
+                }
             ]
         },
         {
@@ -291,6 +306,24 @@
                 },
                 {
                     "name": "minBuyAmount",
+                    "type": "UINT256"
+                }
+            ],
+            "type": "Event"
+        },
+        {
+            "name": "AuctionExtended",
+            "values": [
+                {
+                    "name": "auctionId",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "newCancellationEndDate",
+                    "type": "UINT256"
+                },
+                {
+                    "name": "newAuctionEndDate",
                     "type": "UINT256"
                 }
             ],

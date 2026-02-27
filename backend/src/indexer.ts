@@ -29,6 +29,7 @@ export interface IndexedAuction {
     readonly orderCount: string;
     readonly isSettled: boolean;
     readonly status: AuctionStatus;
+    readonly auctioneerAddress: string;
 }
 
 export interface IndexedClearing {
@@ -115,6 +116,28 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const isSettled = Boolean(r.isSettled ?? false);
 
+        // The SDK only decodes 14 fields from getAuctionData; the 15th field
+        // (auctioneerAddress) is in the raw BinaryReader at byte offset 355.
+        // Layout: 2 addr(64) + 9 u256(288) + 3 bool(3) = 355, then 1 addr(32).
+        let auctioneerAddress = '';
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+            const reader = raw?.result;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (reader && typeof reader.setOffset === 'function' && reader.buffer?.byteLength >= 387) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                reader.setOffset(355);
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                const addr = reader.readAddress();
+                const addrStr = String(addr ?? '');
+                if (addrStr && addrStr !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                    auctioneerAddress = addrStr;
+                }
+            }
+        } catch {
+            // Fallback: auctioneerAddress stays empty
+        }
+
         const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, undefined, orderPlacementStartDate);
 
         const [auctioningTokenName, auctioningTokenSymbol, biddingTokenName, biddingTokenSymbol] = await Promise.all([
@@ -149,6 +172,7 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
             orderCount: String(r.orderCount ?? '0'),
             isSettled,
             status,
+            auctioneerAddress,
         };
     } catch {
         return null;

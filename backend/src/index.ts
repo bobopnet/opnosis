@@ -4,6 +4,7 @@
  * Routes:
  *   GET  /health                -> { status, network, contract }
  *   GET  /stats                 -> AuctionStats
+ *   GET  /price/:tokenAddress   -> { usd: number }
  *   GET  /auctions              -> IndexedAuction[]
  *   GET  /auctions/:id          -> IndexedAuction
  *   GET  /auctions/:id/clearing -> IndexedClearing
@@ -15,6 +16,7 @@ import { OpnosisContract, getNetworkConfig } from '@opnosis/shared';
 import { config, provider } from './config.js';
 import { Cache } from './cache.js';
 import { startIndexer, getAuctions, getAuction, getClearingData, getStats } from './indexer.js';
+import { getTokenUsdPrice } from './pricefeed.js';
 
 const networkConfig = getNetworkConfig(config.network);
 const contract = new OpnosisContract(
@@ -80,6 +82,26 @@ app.get('/stats', async (_req, res) => {
     const stats = await getStats();
     cache.set(cacheKey, stats);
     res.json(stats);
+});
+
+// -- GET /price/:tokenAddress --------------------------------------------------
+
+app.get('/price/:tokenAddress', async (req, res) => {
+    const tokenAddress = req.path_parameters?.['tokenAddress'] ?? '';
+    if (!tokenAddress) {
+        res.status(400).json({ error: 'Missing token address' });
+        return;
+    }
+    const cacheKey = `price:${tokenAddress}`;
+    const cached = cache.get<{ usd: number }>(cacheKey);
+    if (cached) {
+        res.json(cached);
+        return;
+    }
+    const usd = await getTokenUsdPrice(tokenAddress);
+    const data = { usd };
+    cache.set(cacheKey, data);
+    res.json(data);
 });
 
 // -- GET /auctions -------------------------------------------------------------

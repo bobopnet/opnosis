@@ -1,17 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWallet } from './hooks/useWallet.js';
 import { useOpnosis } from './hooks/useOpnosis.js';
 import { AuctionList } from './components/AuctionList.js';
 import { ResultsList } from './components/ResultsList.js';
 import { CreateAuction } from './components/CreateAuction.js';
-import { AuctionDetail } from './components/AuctionDetail.js';
 import { FAQ } from './components/FAQ.js';
 import { API_BASE_URL } from './constants.js';
-import { formatTokenAmount } from '@opnosis/shared';
 import { color, font, btnPrimary, btnSecondary } from './styles.js';
 import type { AuctionStats } from './types.js';
 
-type Tab = 'browse' | 'results' | 'create' | 'detail' | 'faq';
+type Tab = 'main' | 'browse' | 'results' | 'create' | 'faq';
 
 /* ── Inline styles ────────────────────────────────────────────────── */
 
@@ -31,7 +29,7 @@ const s = {
         transform: 'translateX(-50%)',
         height: '100vh',
         width: 'auto',
-        opacity: 0.20,
+        opacity: 0.35,
         pointerEvents: 'none',
         zIndex: 0,
     } as React.CSSProperties,
@@ -206,7 +204,7 @@ const s = {
     statLabel: {
         fontFamily: font.body,
         fontSize: '12px',
-        color: color.textMuted,
+        color: color.textSecondary,
         textTransform: 'uppercase' as const,
         letterSpacing: '0.06em',
     } as React.CSSProperties,
@@ -257,9 +255,9 @@ const s = {
 export function App() {
     const { wallet, provider, connect, disconnect, error: walletError } = useWallet();
     const opnosis = useOpnosis(provider, wallet.network);
-    const [tab, setTab] = useState<Tab>('browse');
-    const [selectedAuctionId, setSelectedAuctionId] = useState<string>('');
+    const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
+    const auctionsRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<AuctionStats | null>(null);
 
     useEffect(() => {
@@ -278,14 +276,9 @@ export function App() {
         return () => { cancelled = true; };
     }, [refreshKey]);
 
-    const viewAuction = (id: string) => {
-        setSelectedAuctionId(id);
-        setTab('detail');
-    };
-
     const onCreated = () => setRefreshKey((k) => k + 1);
 
-    const showHero = tab === 'browse';
+    const showHero = tab === 'main';
 
     return (
         <div style={s.page}>
@@ -308,6 +301,7 @@ export function App() {
                 </div>
 
                 <nav style={s.nav}>
+                    <button style={s.navLink(tab === 'main')} onClick={() => setTab('main')}>Main</button>
                     <button style={s.navLink(tab === 'browse')} onClick={() => setTab('browse')}>Browse</button>
                     <button style={s.navLink(tab === 'results')} onClick={() => setTab('results')}>Results</button>
                     <button style={s.navLink(tab === 'create')} onClick={() => setTab('create')}>Create</button>
@@ -360,42 +354,26 @@ export function App() {
                         <div style={s.pill}><span style={s.pillIcon}>&#9881;</span>Permissionless</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</div>
+                        <div style={s.pill}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</div>
+                        <div style={s.pill}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</div>
                     </div>
                 )}
 
 
-                {/* Stats row */}
-                {stats && (
+                {/* Stats row (main page only) */}
+                {showHero && stats && stats.upcomingAuctions > 0 && (
                     <div style={s.statsRow}>
                         <div style={s.statCard}>
-                            <div style={s.statValue}>{stats.totalAuctions}</div>
-                            <div style={s.statLabel}>Auctions</div>
-                        </div>
-                        <div style={s.statCard}>
-                            <div style={s.statValue}>{stats.settledAuctions}</div>
-                            <div style={s.statLabel}>Settled</div>
-                        </div>
-                        <div style={s.statCard}>
-                            <div style={s.statValue}>{stats.openAuctions}</div>
-                            <div style={s.statLabel}>Open</div>
-                        </div>
-                        {stats.upcomingAuctions > 0 && (
-                            <div style={s.statCard}>
-                                <div style={s.statValue}>{stats.upcomingAuctions}</div>
-                                <div style={s.statLabel}>Upcoming</div>
-                            </div>
-                        )}
-                        <div style={s.statCard}>
-                            <div style={s.statValue}>{formatTokenAmount(BigInt(stats.totalVolume))}</div>
-                            <div style={s.statLabel}>Total Volume</div>
+                            <div style={s.statValue}>{stats.upcomingAuctions}</div>
+                            <div style={s.statLabel}>Upcoming</div>
                         </div>
                     </div>
                 )}
 
                 {/* Tab content */}
-                <div style={s.content}>
-                    {tab === 'browse' && <AuctionList onSelect={viewAuction} refreshKey={refreshKey} />}
-                    {tab === 'results' && <ResultsList />}
+                <div ref={auctionsRef} style={s.content}>
+                    {tab === 'browse' && <AuctionList connected={wallet.connected} walletAddress={wallet.address} opnosis={opnosis} refreshKey={refreshKey} />}
+                    {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (
                         <CreateAuction
                             connected={wallet.connected}
@@ -404,15 +382,7 @@ export function App() {
                             onCreated={onCreated}
                         />
                     )}
-                    {tab === 'detail' && (
-                        <AuctionDetail
-                            auctionId={selectedAuctionId}
-                            connected={wallet.connected}
-                            opnosis={opnosis}
-                            onBack={() => setTab('browse')}
-                        />
-                    )}
-                    {tab === 'faq' && <FAQ />}
+{tab === 'faq' && <FAQ />}
                 </div>
             </main>
 

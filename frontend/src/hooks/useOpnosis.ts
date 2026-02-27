@@ -35,6 +35,7 @@ interface UseOpnosisReturn {
     readonly cancelOrders: (auctionId: bigint, orderIds: bigint[]) => Promise<boolean>;
     readonly settleAuction: (auctionId: bigint) => Promise<boolean>;
     readonly claimOrders: (auctionId: bigint, orderIds: bigint[]) => Promise<boolean>;
+    readonly extendAuction: (auctionId: bigint, newCancellationEndDate: bigint, newAuctionEndDate: bigint) => Promise<boolean>;
     readonly approveToken: (tokenAddress: string, amount: bigint) => Promise<boolean>;
 }
 
@@ -152,6 +153,22 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
         }
     }, [contract]);
 
+    const extendAuction: UseOpnosisReturn['extendAuction'] = useCallback(async (auctionId, newCancellationEndDate, newAuctionEndDate) => {
+        if (!contract) { setTxState({ status: 'error', message: 'Contract not initialized' }); return false; }
+        setTxState({ status: 'pending', message: 'Simulating auction extension...' });
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            const sim = await contract.simulateExtendAuction(auctionId, newCancellationEndDate, newAuctionEndDate);
+            setTxState({ status: 'pending', message: 'Confirm in OP_WALLET...' });
+            await sendSimulation(sim);
+            setTxState({ status: 'success', message: 'Auction extended!' });
+            return true;
+        } catch (err) {
+            setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });
+            return false;
+        }
+    }, [contract]);
+
     const approveToken: UseOpnosisReturn['approveToken'] = useCallback(async (tokenAddress, amount) => {
         if (!provider) { setTxState({ status: 'error', message: 'Provider not initialized' }); return false; }
         setTxState({ status: 'pending', message: 'Simulating approval...' });
@@ -171,5 +188,5 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
         }
     }, [provider, network]);
 
-    return { txState, resetTx, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, approveToken };
+    return { txState, resetTx, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

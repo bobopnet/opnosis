@@ -14,6 +14,15 @@ export const OpnosisEvents = [
         type: BitcoinAbiTypes.Event,
     },
     {
+        name: 'AuctionExtended',
+        values: [
+            { name: 'auctionId', type: ABIDataTypes.UINT256 },
+            { name: 'newCancellationEndDate', type: ABIDataTypes.UINT256 },
+            { name: 'newAuctionEndDate', type: ABIDataTypes.UINT256 },
+        ],
+        type: BitcoinAbiTypes.Event,
+    },
+    {
         name: 'NewSellOrder',
         values: [
             { name: 'auctionId', type: ABIDataTypes.UINT256 },
@@ -81,6 +90,16 @@ export const OpnosisAbi = [
         type: BitcoinAbiTypes.Function,
     },
     {
+        name: 'extendAuction',
+        inputs: [
+            { name: 'auctionId', type: ABIDataTypes.UINT256 },
+            { name: 'newCancellationEndDate', type: ABIDataTypes.UINT256 },
+            { name: 'newAuctionEndDate', type: ABIDataTypes.UINT256 },
+        ],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'placeSellOrders',
         inputs: [
             { name: 'auctionId', type: ABIDataTypes.UINT256 },
@@ -141,34 +160,13 @@ export const OpnosisAbi = [
     {
         name: 'getAuctionData',
         inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
-        outputs: [
-            { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
-            { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
-            { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
-            { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
-            { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
-            { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },
-            { name: 'minBuyAmount', type: ABIDataTypes.UINT256 },
-            { name: 'minimumBiddingAmountPerOrder', type: ABIDataTypes.UINT256 },
-            { name: 'feeNumerator', type: ABIDataTypes.UINT256 },
-            { name: 'minFundingThreshold', type: ABIDataTypes.UINT256 },
-            { name: 'isAtomicClosureAllowed', type: ABIDataTypes.BOOL },
-            { name: 'orderCount', type: ABIDataTypes.UINT256 },
-            { name: 'isSettled', type: ABIDataTypes.BOOL },
-            { name: 'fundingNotReached', type: ABIDataTypes.BOOL },
-        ],
+        outputs: [{ name: 'auctioningToken', type: ABIDataTypes.ADDRESS }],
         type: BitcoinAbiTypes.Function,
     },
     {
         name: 'getClearingOrder',
         inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
-        outputs: [
-            { name: 'clearingBuyAmount', type: ABIDataTypes.UINT256 },
-            { name: 'clearingSellAmount', type: ABIDataTypes.UINT256 },
-            { name: 'volumeClearingPriceOrder', type: ABIDataTypes.UINT256 },
-            { name: 'bidRaised', type: ABIDataTypes.UINT256 },
-            { name: 'clearingOrderId', type: ABIDataTypes.UINT256 },
-        ],
+        outputs: [{ name: 'clearingBuyAmount', type: ABIDataTypes.UINT256 }],
         type: BitcoinAbiTypes.Function,
     },
     {

@@ -9,6 +9,7 @@
  */
 
 import { getContract, NativeSwapAbi, MOTOSWAP_ROUTER_ABI } from 'opnet';
+import { Address } from '@btc-vision/transaction';
 import { config, provider } from './config.js';
 import { getNetworkConfig } from '@opnosis/shared';
 
@@ -23,7 +24,7 @@ interface GetReserveResult {
 }
 
 interface NativeSwapReader {
-    getReserve(token: string): Promise<GetReserveResult>;
+    getReserve(token: Address): Promise<GetReserveResult>;
 }
 
 interface GetAmountsOutResult {
@@ -33,7 +34,7 @@ interface GetAmountsOutResult {
 }
 
 interface MotoswapRouterReader {
-    getAmountsOut(amountIn: bigint, path: string[]): Promise<GetAmountsOutResult>;
+    getAmountsOut(amountIn: bigint, path: Address[]): Promise<GetAmountsOutResult>;
 }
 
 // ─── BTC/USD price from CoinGecko ────────────────────────────────────────────
@@ -95,12 +96,15 @@ let nativeSwapContract: NativeSwapReader | null = null;
 async function fetchMotoBtc(): Promise<number | null> {
     if (!nativeSwapContract || !config.motoAddress) return null;
     try {
-        const result = await nativeSwapContract.getReserve(config.motoAddress);
+        const result = await nativeSwapContract.getReserve(Address.fromString(config.motoAddress));
         const { virtualBTCReserve, virtualTokenReserve } = result.properties;
         if (virtualBTCReserve === 0n || virtualTokenReserve === 0n) {
             return motoBtcCache?.price ?? null;
         }
-        const price = Number(virtualBTCReserve) / Number(virtualTokenReserve);
+        // NativeSwap uses 18-decimal precision for virtual token reserves,
+        // while BTC reserves are in satoshis (8 decimals).
+        // Price = (btcReserve / 1e8) / (tokenReserve / 1e18) = BTC per 1 human MOTO
+        const price = (Number(virtualBTCReserve) / 1e8) / (Number(virtualTokenReserve) / 1e18);
         motoBtcCache = { price, fetchedAt: Date.now() };
         return price;
     } catch {
@@ -141,7 +145,7 @@ async function fetchTokenMoto(tokenAddress: string): Promise<number | null> {
     try {
         const result = await routerContract.getAmountsOut(
             100_000_000n, // 1 token (1e8 base units)
-            [tokenAddress, config.motoAddress],
+            [Address.fromString(tokenAddress), Address.fromString(config.motoAddress)],
         );
         const amountsOut = result.properties.amountsOut;
         if (!amountsOut || amountsOut.length < 2 || amountsOut[1] === 0n) {

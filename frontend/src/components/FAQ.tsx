@@ -130,7 +130,7 @@ const fieldTable = (
             <tr><td style={s.tdField}>Min Funding Threshold</td><td style={s.td}>Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. 0 = disabled.</td></tr>
             <tr><td style={s.tdField}>Cancel Window</td><td style={s.td}>Minutes during which bidders can cancel. After this, bids are final.</td></tr>
             <tr><td style={s.tdField}>Auction Duration</td><td style={s.td}>Minutes the auction accepts bids before settlement.</td></tr>
-            <tr><td style={s.tdField}>Atomic Closure</td><td style={s.td}>When enabled, anyone can settle once enough bids clear.</td></tr>
+            <tr><td style={s.tdField}>Atomic Closure</td><td style={s.td}>When enabled, the auctioneer can settle the auction early once the min funding threshold is met. When disabled, the auction always runs for the full duration.</td></tr>
         </tbody>
     </table>
 );
@@ -207,6 +207,31 @@ const sections: Section[] = [
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
                 a: 'The auction is considered unsuccessful. All bidding tokens are returned to bidders, and the auctioneer\u2019s sell tokens are returned. No fees are charged.',
+            },
+            {
+                q: 'What is atomic closure and should I enable it?',
+                a: <>
+                    Atomic closure lets the auctioneer settle their auction early — before the scheduled end time. Only the auctioneer can trigger early settlement; no one else can.
+                    <br /><br />
+                    <strong>Enable it</strong> if you want the flexibility to close a fundraise early once the minimum funding threshold is met. This is useful when speed matters more than maximizing participation.
+                    <br /><br />
+                    <strong>Disable it</strong> if you want the auction to run for the full duration, giving all potential bidders time to participate. This maximizes price discovery and is the safer default for most auctions.
+                    <br /><br />
+                    Note: early settlement is only possible when the min funding threshold has been reached. If bids are below the threshold, the auctioneer must wait for more bids or let the auction run to its end.
+                </>,
+            },
+            {
+                q: 'Can I extend my auction after creating it?',
+                a: <>
+                    Yes. As the auctioneer, you can extend both the cancel window end date and the auction end date at any time before settlement. Open the auction card on the Browse page and use the <strong>Extend Auction</strong> section (visible only to you).
+                    <br /><br />
+                    <strong>Rules:</strong><br />
+                    &bull; You can only push dates forward &mdash; shortening is not allowed.<br />
+                    &bull; The cancel window end cannot exceed the auction end date.<br />
+                    &bull; Extension is not possible after the auction has been settled.
+                    <br /><br />
+                    This is useful if you want to give bidders more time to participate or if market conditions change and you want a longer price-discovery window.
+                </>,
             },
         ],
     },

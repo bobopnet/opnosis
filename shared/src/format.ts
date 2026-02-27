@@ -5,13 +5,14 @@
 import { TOKEN_DECIMALS } from './constants.js';
 import type { AuctionStatus } from './types.js';
 
-/** Format a bigint token amount to a human-readable string (e.g., "1.50000000"). */
+/** Format a bigint token amount to a human-readable string, stripping trailing zeros. */
 export function formatTokenAmount(amount: bigint, decimals: number = TOKEN_DECIMALS): string {
     const divisor = 10n ** BigInt(decimals);
     const whole = amount / divisor;
     const frac = amount % divisor;
-    const fracStr = frac.toString().padStart(decimals, '0');
-    return `${whole.toString()}.${fracStr}`;
+    if (frac === 0n) return whole.toLocaleString();
+    const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '');
+    return `${whole.toLocaleString()}.${fracStr}`;
 }
 
 /** Parse a decimal string like "1.5" into base units (bigint). */
@@ -26,9 +27,12 @@ export function parseTokenAmount(input: string, decimals: number = TOKEN_DECIMAL
     return BigInt(wholePart) * 10n ** BigInt(decimals) + BigInt(fracPart);
 }
 
-/** Format a Unix timestamp (seconds, as bigint) to a locale date/time string. */
+/** Format a Unix timestamp (seconds or milliseconds, as bigint) to a locale date/time string. */
 export function formatTimestamp(ts: bigint): string {
-    return new Date(Number(ts) * 1000).toLocaleString();
+    const n = Number(ts);
+    // If > 1e10 the value is in milliseconds (no seconds timestamp exceeds this until year 2286)
+    const ms = n > 1e10 ? n : n * 1000;
+    return new Date(ms).toLocaleString();
 }
 
 /** Format price as "X bidding tokens per 1 auctioning token". */

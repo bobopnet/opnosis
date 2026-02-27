@@ -86,6 +86,7 @@ import {
 } from '@btc-vision/btc-runtime/runtime';
 import {
     AuctionClearedEvent,
+    AuctionExtendedEvent,
     AuctionFundingFailedEvent,
     CancellationSellOrderEvent,
     ClaimedFromOrderEvent,
@@ -394,17 +395,33 @@ export class Opnosis extends OP_NET {
         }
     }
 
-    /** Revert if auction is not in the solution-submission phase (after auctionEndDate, not settled). */
+    /**
+     * Revert if auction is not in the solution-submission phase (after auctionEndDate, not settled).
+     * If atomic closure is enabled, the auctioneer may settle before the end date
+     * (min funding threshold is enforced separately in settleAuction).
+     */
     private requireSolutionSubmission(auctionId: u256): void {
         if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
             throw new Revert('Opnosis: auction does not exist');
         }
-        const now = u256.fromU64(Blockchain.block.medianTimestamp);
-        if (now < this.mapAuctionEnd.get(auctionId)) {
-            throw new Revert('Opnosis: auction has not ended yet');
-        }
         if (!u256.eq(this.mapSettled.get(auctionId), u256.Zero)) {
             throw new Revert('Opnosis: auction already settled');
+        }
+        const now = u256.fromU64(Blockchain.block.medianTimestamp);
+        if (now < this.mapAuctionEnd.get(auctionId)) {
+            // Auction has not ended yet — allow early settlement only if atomic closure
+            // is enabled AND the caller is the auctioneer.
+            const atomicAllowed = !u256.eq(this.mapIsAtomic.get(auctionId), u256.Zero);
+            if (!atomicAllowed) {
+                throw new Revert('Opnosis: auction has not ended yet');
+            }
+            const senderKey = addrToU256(Blockchain.tx.sender);
+            const auctioneerKey = this.mapUserIdToAddr.get(
+                this.mapAuctioneerUserId.get(auctionId),
+            );
+            if (!u256.eq(senderKey, auctioneerKey)) {
+                throw new Revert('Opnosis: only auctioneer can settle early');
+            }
         }
     }
 
@@ -699,7 +716,8 @@ export class Opnosis extends OP_NET {
      * @param minimumBiddingAmountPerOrder  Minimum bidding tokens per individual order.
      * @param minFundingThreshold       Minimum total bidding tokens raised for the auction to clear.
      *                                  If not reached, all participants are fully refunded.
-     * @param isAtomicClosureAllowed    Reserved for future atomic-closure support (stored, not enforced).
+     * @param isAtomicClosureAllowed    When true, the auctioneer may settle the auction before
+     *                                  auctionEndDate. Non-auctioneers must still wait for end date.
      * @returns auctionId               The ID of the newly created auction.
      */
     @method(
@@ -819,6 +837,77 @@ export class Opnosis extends OP_NET {
 
         const response = new BytesWriter(U256_BYTE_LENGTH);
         response.writeU256(auctionId);
+        return response;
+    }
+
+    /**
+     * Extend an auction's deadlines. Only the auctioneer may call this, and only
+     * before settlement. Both dates can only be pushed forward (no shortening).
+     *
+     * @param auctionId              The auction to extend.
+     * @param newCancellationEndDate New cancellation deadline (must be >= current).
+     * @param newAuctionEndDate      New auction end date (must be > current).
+     */
+    @method(
+        { name: 'auctionId', type: ABIDataTypes.UINT256 },
+        { name: 'newCancellationEndDate', type: ABIDataTypes.UINT256 },
+        { name: 'newAuctionEndDate', type: ABIDataTypes.UINT256 },
+    )
+    @emit('AuctionExtended')
+    @returns({ name: 'success', type: ABIDataTypes.BOOL })
+    public extendAuction(calldata: Calldata): BytesWriter {
+        this.lock();
+
+        const auctionId = calldata.readU256();
+        const newCancellationEndDate = calldata.readU256();
+        const newAuctionEndDate = calldata.readU256();
+
+        // ── Checks ───────────────────────────────────────────────────────────
+        if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
+            throw new Revert('Opnosis: auction does not exist');
+        }
+        if (!u256.eq(this.mapSettled.get(auctionId), u256.Zero)) {
+            throw new Revert('Opnosis: auction already settled');
+        }
+
+        // Only the auctioneer may extend.
+        const senderKey = addrToU256(Blockchain.tx.sender);
+        const auctioneerKey = this.mapUserIdToAddr.get(
+            this.mapAuctioneerUserId.get(auctionId),
+        );
+        if (!u256.eq(senderKey, auctioneerKey)) {
+            throw new Revert('Opnosis: only auctioneer can extend');
+        }
+
+        // Auction end can only be pushed forward.
+        const currentAuctionEnd = this.mapAuctionEnd.get(auctionId);
+        if (newAuctionEndDate <= currentAuctionEnd) {
+            throw new Revert('Opnosis: new auction end must be later than current');
+        }
+
+        // Cancellation end can only be pushed forward (or stay the same).
+        const currentCancellationEnd = this.mapCancellationEnd.get(auctionId);
+        if (newCancellationEndDate < currentCancellationEnd) {
+            throw new Revert('Opnosis: cannot shorten cancellation window');
+        }
+
+        // Cancellation end must not exceed auction end.
+        if (newCancellationEndDate > newAuctionEndDate) {
+            throw new Revert('Opnosis: cancellation end exceeds auction end');
+        }
+
+        // ── Effects ──────────────────────────────────────────────────────────
+        this.mapCancellationEnd.set(auctionId, newCancellationEndDate);
+        this.mapAuctionEnd.set(auctionId, newAuctionEndDate);
+
+        this.emitEvent(
+            new AuctionExtendedEvent(auctionId, newCancellationEndDate, newAuctionEndDate),
+        );
+
+        this.unlock();
+
+        const response = new BytesWriter(BOOLEAN_BYTE_LENGTH);
+        response.writeBoolean(true);
         return response;
     }
 
@@ -1052,7 +1141,8 @@ export class Opnosis extends OP_NET {
      * Settle the auction: find the clearing price, send proceeds to the auctioneer,
      * and mark the auction as finished.
      *
-     * Must be called after the auction end date.
+     * Must be called after the auction end date, unless atomic closure is enabled
+     * and the caller is the auctioneer (early settlement).
      * Any unfinished sweep from precalculateSellAmountSum is completed here (bounded by MAX_ORDERS).
      *
      * Clearing price determination:
@@ -1062,6 +1152,7 @@ export class Opnosis extends OP_NET {
      *     at this order's implied price.
      *   • If no bidder order satisfies this, the auctioneer's minimum price is the clearing price.
      *   • If total raised < minFundingThreshold, the auction fails and all are refunded.
+     *   • Early atomic settlement reverts if threshold not met (auction stays open for more bids).
      *
      * @returns clearingBuyAmount   The buyAmount field of the clearing order (auctioning tokens).
      */
@@ -1100,6 +1191,14 @@ export class Opnosis extends OP_NET {
 
         // ── Minimum funding threshold check ───────────────────────────────────
         if (bidRaised < minFunding) {
+            // Early atomic settlement: revert so the auction stays open for more bids.
+            // All sweep state changes are rolled back automatically on revert.
+            const isEarlyAtomic =
+                !u256.eq(this.mapIsAtomic.get(auctionId), u256.Zero) &&
+                u256.fromU64(Blockchain.block.medianTimestamp) < this.mapAuctionEnd.get(auctionId);
+            if (isEarlyAtomic) {
+                throw new Revert('Opnosis: min funding threshold not met yet');
+            }
             this.mapFundingNotReached.set(auctionId, u256.One);
             this.emitEvent(new AuctionFundingFailedEvent(auctionId, bidRaised, minFunding));
         }
@@ -1363,7 +1462,8 @@ export class Opnosis extends OP_NET {
             BOOLEAN_BYTE_LENGTH + // isAtomicClosureAllowed
             U256_BYTE_LENGTH +    // orderCount
             BOOLEAN_BYTE_LENGTH + // settled
-            BOOLEAN_BYTE_LENGTH   // fundingNotReached
+            BOOLEAN_BYTE_LENGTH + // fundingNotReached
+            ADDRESS_BYTE_LENGTH   // auctioneerAddress
         );
 
         response.writeAddress(u256ToAddr(this.mapAuctioningToken.get(auctionId)));
@@ -1380,6 +1480,9 @@ export class Opnosis extends OP_NET {
         response.writeU256(this.mapOrderCount.get(auctionId));
         response.writeBoolean(!u256.eq(this.mapSettled.get(auctionId), u256.Zero));
         response.writeBoolean(!u256.eq(this.mapFundingNotReached.get(auctionId), u256.Zero));
+        response.writeAddress(u256ToAddr(this.mapUserIdToAddr.get(
+            this.mapAuctioneerUserId.get(auctionId),
+        )));
 
         return response;
     }

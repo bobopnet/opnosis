@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
-import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR } from '@opnosis/shared';
+import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR, KNOWN_TOKENS } from '@opnosis/shared';
+import { API_BASE_URL } from '../constants.js';
 import {
     color, font, card, btnPrimary, btnDisabled,
     input as inputStyle, label as labelStyle, sectionTitle,
@@ -116,17 +117,52 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [auctioningToken, setAuctioningToken] = useState('');
     const [biddingToken, setBiddingToken] = useState('');
     const [sellAmount, setSellAmount] = useState('0');
-    const [minBuyAmount, setMinBuyAmount] = useState('0');
+    const [reservePriceUsd, setReservePriceUsd] = useState('');
     const [minBidPerOrder, setMinBidPerOrder] = useState('0');
     const [minFunding, setMinFunding] = useState('0');
     const [startMode, setStartMode] = useState<'now' | 'schedule'>('now');
     const [scheduledStart, setScheduledStart] = useState('');
     const [cancelDays, setCancelDays] = useState('0');
-    const [cancelHours, setCancelHours] = useState('1');
+    const [cancelHours, setCancelHours] = useState('0');
     const [auctionDays, setAuctionDays] = useState('1');
     const [auctionHours, setAuctionHours] = useState('0');
     const [atomicClose, setAtomicClose] = useState(false);
     const [step, setStep] = useState<'approve' | 'create'>('approve');
+    const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
+
+    useEffect(() => {
+        setBiddingTokenUsdPrice(null);
+        if (!biddingToken) return;
+        let cancelled = false;
+        async function loadPrice() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/price/${biddingToken}`);
+                if (!res.ok) return;
+                const data = await res.json() as { usd: number };
+                if (!cancelled && data.usd > 0) setBiddingTokenUsdPrice(data.usd);
+            } catch {
+                // price unavailable
+            }
+        }
+        void loadPrice();
+        return () => { cancelled = true; };
+    }, [biddingToken]);
+
+    const auctioningTokenSymbol = KNOWN_TOKENS.find((t) =>
+        (network === 'mainnet' ? t.mainnet : t.testnet) === auctioningToken,
+    )?.symbol ?? '';
+
+    const biddingTokenSymbol = KNOWN_TOKENS.find((t) =>
+        (network === 'mainnet' ? t.mainnet : t.testnet) === biddingToken,
+    )?.symbol ?? '';
+
+    // Compute minBuyAmount in bidding tokens from USD reserve price
+    const computedMinBuyTokens = (() => {
+        const price = parseFloat(reservePriceUsd);
+        const sell = parseFloat(sellAmount);
+        if (!price || !sell || price <= 0 || sell <= 0 || biddingTokenUsdPrice === null || biddingTokenUsdPrice <= 0) return null;
+        return (price * sell) / biddingTokenUsdPrice;
+    })();
 
     const { txState, resetTx, createAuction, approveToken } = opnosis;
 
@@ -156,7 +192,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             cancellationEndDate: baseTime + cancelSec,
             auctionEndDate: baseTime + auctionSec,
             auctionedSellAmount: parseTokenAmount(sellAmount),
-            minBuyAmount: parseTokenAmount(minBuyAmount),
+            minBuyAmount: computedMinBuyTokens !== null ? parseTokenAmount(computedMinBuyTokens.toFixed(8)) : 0n,
             minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0'),
             minFundingThreshold: parseTokenAmount(minFunding),
             isAtomicClosureAllowed: atomicClose,
@@ -186,7 +222,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             <div style={s.row}>
                 <TokenSelect
                     label="Auctioning Token"
-                    help="The OP-20 token you are selling. The total sell amount will be distributed to winning bidders."
+                    help="The token you want to sell. Winning bidders will receive this token proportional to their bids."
                     value={auctioningToken}
                     onChange={setAuctioningToken}
                     network={network}
@@ -194,7 +230,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                 />
                 <TokenSelect
                     label="Bidding Token"
-                    help="The OP-20 token bidders use to place bids. You receive this token from winning bids."
+                    help="The token bidders must use to participate. You will receive this token as payment from winning bids."
                     value={biddingToken}
                     onChange={setBiddingToken}
                     network={network}
@@ -202,26 +238,36 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Sell Amount<HelpTip text="Total number of tokens you are putting up for auction." /></label>
+                    <label style={labelStyle}>Total Auctioned Tokens{auctioningTokenSymbol ? ` (${auctioningTokenSymbol})` : ''}<HelpTip text="The total number of tokens to be distributed to winning bidders." /></label>
                     <input style={inputStyle} value={sellAmount} onChange={(e) => setSellAmount(e.target.value)} placeholder="100.0" />
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Min Buy Amount<HelpTip text="Minimum total bidding tokens you will accept for the entire sell amount. Sets the reserve price." /></label>
-                    <input style={inputStyle} value={minBuyAmount} onChange={(e) => setMinBuyAmount(e.target.value)} placeholder="50.0" />
+                    <label style={labelStyle}>Reserve Price per Token (USD)<HelpTip text="The lowest USD price per token you are willing to accept. Bids below this price will not be filled. The equivalent amount in bidding tokens is calculated automatically." /></label>
+                    <input style={inputStyle} value={reservePriceUsd} onChange={(e) => setReservePriceUsd(e.target.value)} placeholder="0.05" />
+                    {computedMinBuyTokens !== null && (
+                        <span style={{ color: color.textMuted, fontSize: '13px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>
+                            = {computedMinBuyTokens.toFixed(4)} {biddingTokenSymbol} total min buy
+                        </span>
+                    )}
                 </div>
             </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Min Bid Per Order<HelpTip text="Smallest bid a single bidder can place. Prevents dust bids. 0 = no minimum." /></label>
+                    <label style={labelStyle}>Min Bid Per Order{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum amount of bidding tokens a single bid must contain. Prevents spam and dust bids. Set to 0 to allow any amount." /></label>
                     <input style={inputStyle} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Min Funding Threshold<HelpTip text="Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. 0 = disabled." /></label>
+                    <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If total bids fall below this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 to disable." /></label>
                     <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
+                    {(() => {
+                        const val = parseFloat(minFunding);
+                        if (!val || val <= 0 || biddingTokenUsdPrice === null) return null;
+                        return <span style={{ color: color.textMuted, fontSize: '13px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>(${(val * biddingTokenUsdPrice).toFixed(2)} USD)</span>;
+                    })()}
                 </div>
             </div>
             <div style={s.field}>
-                <label style={labelStyle}>Start Mode<HelpTip text="Choose when bidding opens. 'Start Now' opens bidding immediately. 'Schedule Start' lets you set a future date." /></label>
+                <label style={labelStyle}>Start Mode<HelpTip text="Controls when bidders can begin placing bids. 'Start Now' opens bidding as soon as the auction is created. 'Schedule Start' delays bidding until a specific date and time." /></label>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
                     <label style={s.checkbox}>
                         <input type="radio" name="startMode" checked={startMode === 'now'} onChange={() => setStartMode('now')} />
@@ -243,7 +289,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Cancel Window<HelpTip text={startMode === 'schedule' ? 'Time from scheduled start during which bidders can cancel orders.' : 'Time from now during which bidders can cancel orders. After this, all bids are final.'} /></label>
+                    <label style={labelStyle}>Cancel Window (optional)<HelpTip text={startMode === 'schedule' ? 'How long after the scheduled start bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.' : 'How long from now bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.'} /></label>
                     <div style={s.dualInput}>
                         <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value)} />
                         <span style={s.unitLabel}>days</span>
@@ -252,7 +298,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     </div>
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Auction Duration<HelpTip text={startMode === 'schedule' ? 'Time from scheduled start the auction accepts bids.' : 'Time from now the auction accepts bids. After this, the auction can be settled.'} /></label>
+                    <label style={labelStyle}>Auction Duration<HelpTip text={startMode === 'schedule' ? 'How long the auction runs after the scheduled start. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.' : 'How long the auction runs from now. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.'} /></label>
                     <div style={s.dualInput}>
                         <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value)} />
                         <span style={s.unitLabel}>days</span>
@@ -264,7 +310,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             <label style={s.checkbox}>
                 <input type="checkbox" checked={atomicClose} onChange={(e) => setAtomicClose(e.target.checked)} />
                 Allow atomic closure
-                <HelpTip text="When enabled, anyone can settle the auction immediately once enough bids clear the reserve price, without waiting for the end time." />
+                <HelpTip text="When enabled, the auctioneer can settle the auction early once the min funding threshold is met. Useful for fast fundraises, but may reduce price discovery by cutting off later bids. When disabled, the auction runs for the full duration, maximizing participation and price discovery." />
             </label>
 
             {step === 'approve' ? (

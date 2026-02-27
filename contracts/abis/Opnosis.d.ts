@@ -12,6 +12,11 @@ export type NewAuctionEvent = {
     readonly auctionedSellAmount: bigint;
     readonly minBuyAmount: bigint;
 };
+export type AuctionExtendedEvent = {
+    readonly auctionId: bigint;
+    readonly newCancellationEndDate: bigint;
+    readonly newAuctionEndDate: bigint;
+};
 export type NewSellOrderEvent = {
     readonly auctionId: bigint;
     readonly userId: bigint;
@@ -52,6 +57,16 @@ export type InitiateAuction = CallResult<
         auctionId: bigint;
     },
     OPNetEvent<NewAuctionEvent>[]
+>;
+
+/**
+ * @description Represents the result of the extendAuction function call.
+ */
+export type ExtendAuction = CallResult<
+    {
+        success: boolean;
+    },
+    OPNetEvent<AuctionExtendedEvent>[]
 >;
 
 /**
@@ -130,19 +145,6 @@ export type GetUserId = CallResult<
 export type GetAuctionData = CallResult<
     {
         auctioningToken: Address;
-        biddingToken: Address;
-        orderPlacementStartDate: bigint;
-        cancellationEndDate: bigint;
-        auctionEndDate: bigint;
-        auctionedSellAmount: bigint;
-        minBuyAmount: bigint;
-        minimumBiddingAmountPerOrder: bigint;
-        feeNumerator: bigint;
-        minFundingThreshold: bigint;
-        isAtomicClosureAllowed: boolean;
-        orderCount: bigint;
-        isSettled: boolean;
-        fundingNotReached: boolean;
     },
     OPNetEvent<never>[]
 >;
@@ -153,10 +155,6 @@ export type GetAuctionData = CallResult<
 export type GetClearingOrder = CallResult<
     {
         clearingBuyAmount: bigint;
-        clearingSellAmount: bigint;
-        volumeClearingPriceOrder: bigint;
-        bidRaised: bigint;
-        clearingOrderId: bigint;
     },
     OPNetEvent<never>[]
 >;
@@ -187,6 +185,7 @@ export interface IOpnosis extends IOP_NETContract {
         minFundingThreshold: bigint,
         isAtomicClosureAllowed: boolean,
     ): Promise<InitiateAuction>;
+    extendAuction(auctionId: bigint, newCancellationEndDate: bigint, newAuctionEndDate: bigint): Promise<ExtendAuction>;
     placeSellOrders(auctionId: bigint, minBuyAmounts: bigint[], sellAmounts: bigint[]): Promise<PlaceSellOrders>;
     cancelSellOrders(auctionId: bigint, orderIds: bigint[]): Promise<CancelSellOrders>;
     precalculateSellAmountSum(auctionId: bigint, iterationSteps: bigint): Promise<PrecalculateSellAmountSum>;

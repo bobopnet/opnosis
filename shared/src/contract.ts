@@ -48,6 +48,11 @@ interface OpnosisMethods {
         auctionId: bigint,
         orderIds: readonly bigint[],
     ) => Promise<SimResult>;
+    readonly extendAuction: (
+        auctionId: bigint,
+        newCancellationEndDate: bigint,
+        newAuctionEndDate: bigint,
+    ) => Promise<SimResult>;
     readonly setFeeParameters: (
         feeNumerator: bigint,
         feeReceiver: string,
@@ -149,6 +154,14 @@ export class OpnosisContract {
 
     public async simulateSettle(auctionId: bigint): Promise<SimResult> {
         return this.#contract.settleAuction(auctionId);
+    }
+
+    public async simulateExtendAuction(
+        auctionId: bigint,
+        newCancellationEndDate: bigint,
+        newAuctionEndDate: bigint,
+    ): Promise<SimResult> {
+        return this.#contract.extendAuction(auctionId, newCancellationEndDate, newAuctionEndDate);
     }
 
     public async simulateClaimFromParticipantOrder(

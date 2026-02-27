@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount, formatPrice } from '@opnosis/shared';
 import { color, font, card, badge as badgeStyle } from '../styles.js';
-import type { IndexedAuction, IndexedClearing } from '../types.js';
+import type { IndexedAuction, IndexedClearing, AuctionStats } from '../types.js';
 
 const s = {
     grid: {
@@ -72,6 +72,25 @@ const s = {
         padding: '48px 24px',
         fontFamily: font.body,
     } as React.CSSProperties,
+    totalRaised: {
+        textAlign: 'center' as const,
+        marginBottom: '32px',
+    } as React.CSSProperties,
+    totalRaisedValue: {
+        fontFamily: font.display,
+        fontSize: '36px',
+        fontWeight: 700,
+        color: color.amber,
+        lineHeight: 1.2,
+    } as React.CSSProperties,
+    totalRaisedLabel: {
+        fontFamily: font.body,
+        fontSize: '13px',
+        color: color.textSecondary,
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.06em',
+        marginTop: '4px',
+    } as React.CSSProperties,
 };
 
 interface AuctionWithClearing {
@@ -79,7 +98,11 @@ interface AuctionWithClearing {
     clearing: IndexedClearing | null;
 }
 
-export function ResultsList() {
+interface Props {
+    readonly stats: AuctionStats | null;
+}
+
+export function ResultsList({ stats }: Props) {
     const [results, setResults] = useState<AuctionWithClearing[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -120,7 +143,14 @@ export function ResultsList() {
     if (results.length === 0) return <div style={s.empty}>No settled auctions yet</div>;
 
     return (
-        <div style={s.grid}>
+        <>
+            {stats && Number(stats.totalRaisedUsd) > 0 && (
+                <div style={s.totalRaised}>
+                    <div style={s.totalRaisedValue}>${Number(stats.totalRaisedUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style={s.totalRaisedLabel}>Total Raised</div>
+                </div>
+            )}
+            <div style={s.grid}>
             {results.map(({ auction, clearing }) => {
                 const clearingPrice = clearing
                     ? formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))
@@ -152,6 +182,7 @@ export function ResultsList() {
                     </div>
                 );
             })}
-        </div>
+            </div>
+        </>
     );
 }

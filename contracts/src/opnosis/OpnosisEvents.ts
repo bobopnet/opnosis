@@ -119,6 +119,20 @@ export class FeeParametersUpdatedEvent extends NetEvent {
     }
 }
 
+// ─── AuctionExtended ────────────────────────────────────────────────────────
+// Emitted when an auctioneer extends the auction deadlines.
+// auctionId(32) + newCancellationEndDate(32) + newAuctionEndDate(32) = 96 bytes
+@final
+export class AuctionExtendedEvent extends NetEvent {
+    constructor(auctionId: u256, newCancellationEndDate: u256, newAuctionEndDate: u256) {
+        const data = new BytesWriter(96);
+        data.writeU256(auctionId);
+        data.writeU256(newCancellationEndDate);
+        data.writeU256(newAuctionEndDate);
+        super('AuctionExtended', data);
+    }
+}
+
 // ─── AuctionFundingFailed ────────────────────────────────────────────────────
 // Emitted when an auction settles below its minFundingThreshold.
 // auctionId(32) + bidRaised(32) + minFundingThreshold(32) = 96 bytes

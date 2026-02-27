@@ -154,14 +154,14 @@ if (currentAllowance < auctionedSellAmount) {
 // ── Create auction ───────────────────────────────────────────────────────────
 console.log('\nCreating auction...');
 
-// Contract uses Blockchain.block.medianTimestamp (milliseconds)
+// Timestamps in Unix milliseconds (matches Blockchain.block.medianTimestamp)
 const now = BigInt(Date.now());
 console.log(`Now     : ${now} (${new Date(Number(now)).toISOString()})`);
-const cancellationEndDate = now + 3_600_000n;   // 1 hour from now
-const auctionEndDate = now + 7_200_000n;        // 2 hours from now
+const cancellationEndDate = now + 43_200_000n;  // 12 hours from now
+const auctionEndDate = now + 86_400_000n;       // 1 day from now
 const minBuyAmount = auctionedSellAmount / 10n; // 10:1 minimum price
 const minimumBiddingAmountPerOrder = 1_00000000n; // 1 token minimum bid
-const minFundingThreshold = 1_000_000_00000000n; // 1M MOTO minimum funding
+const minFundingThreshold = 200_000_00000000n; // 200K MOTO minimum funding
 const isAtomicClosureAllowed = true;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
