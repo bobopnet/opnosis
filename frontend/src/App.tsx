@@ -112,6 +112,7 @@ const s = {
     /* Hero */
     hero: {
         padding: '64px 0 48px',
+        textAlign: 'center' as const,
     } as React.CSSProperties,
     heroTitle: {
         fontFamily: font.display,
@@ -133,12 +134,13 @@ const s = {
         color: color.textSecondary,
         lineHeight: 1.6,
         maxWidth: '560px',
-        marginBottom: '32px',
+        margin: '0 auto 32px',
     } as React.CSSProperties,
     heroBtns: {
         display: 'flex',
         gap: '12px',
         flexWrap: 'wrap' as const,
+        justifyContent: 'center',
     } as React.CSSProperties,
 
     /* Feature pills */
@@ -146,6 +148,7 @@ const s = {
         display: 'flex',
         gap: '12px',
         flexWrap: 'wrap' as const,
+        justifyContent: 'center',
         marginBottom: '40px',
     } as React.CSSProperties,
     pill: {
@@ -161,44 +164,6 @@ const s = {
     } as React.CSSProperties,
     pillIcon: {
         marginRight: '8px',
-    } as React.CSSProperties,
-
-    /* Open source banner */
-    openSourceBanner: {
-        marginBottom: '40px',
-        padding: '20px 24px',
-        borderRadius: '12px',
-        background: color.bgSurface,
-        border: `1px solid ${color.borderSubtle}`,
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.3)',
-    } as React.CSSProperties,
-    openSourceInner: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '16px',
-    } as React.CSSProperties,
-    openSourceIcon: {
-        fontSize: '24px',
-        lineHeight: 1,
-        flexShrink: 0,
-        marginTop: '2px',
-    } as React.CSSProperties,
-    openSourceTitle: {
-        fontFamily: font.display,
-        fontSize: '15px',
-        fontWeight: 600,
-        color: color.textPrimary,
-        marginBottom: '6px',
-    } as React.CSSProperties,
-    openSourceDesc: {
-        fontFamily: font.body,
-        fontSize: '13px',
-        color: color.textSecondary,
-        lineHeight: 1.55,
-    } as React.CSSProperties,
-    openSourceLink: {
-        color: color.purpleLight,
-        textDecoration: 'underline',
     } as React.CSSProperties,
 
     /* Stats row */
@@ -372,32 +337,10 @@ export function App() {
                         <div style={s.pill}><span style={s.pillIcon}>&#9935;</span>Front-Running Resistant</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#9881;</span>Permissionless</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</div>
+                        <div style={s.pill}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</div>
                     </div>
                 )}
 
-                {/* Open source banner (browse tab only) */}
-                {showHero && (
-                    <div style={s.openSourceBanner}>
-                        <div style={s.openSourceInner}>
-                            <span style={s.openSourceIcon}>&#128272;</span>
-                            <div>
-                                <div style={s.openSourceTitle}>Fully open source. Verify everything.</div>
-                                <div style={s.openSourceDesc}>
-                                    Every line of code &mdash; smart contracts, frontend, and backend &mdash; is{' '}
-                                    <a
-                                        href="https://github.com/bobopnet/opnosis"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={s.openSourceLink}
-                                    >
-                                        publicly auditable on GitHub
-                                    </a>.
-                                    No black boxes. No hidden logic. You don&apos;t have to trust us &mdash; read the code.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {/* Stats row */}
                 {stats && (

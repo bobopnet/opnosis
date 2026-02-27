@@ -11,6 +11,8 @@ export interface KnownToken {
     readonly decimals: number;
     readonly testnet: string;
     readonly mainnet: string;
+    /** If true, this token can only be used for bidding, not auctioning. */
+    readonly biddingOnly?: boolean;
 }
 
 export const KNOWN_TOKENS: readonly KnownToken[] = [
@@ -20,6 +22,7 @@ export const KNOWN_TOKENS: readonly KnownToken[] = [
         decimals: 8,
         testnet: '0xfd4473840751d58d9f8b73bdd57d6c5260453d5518bd7cd02d0a4cf3df9bf4dd',
         mainnet: '',
+        biddingOnly: true,
     },
     {
         symbol: 'PILL',
@@ -27,5 +30,6 @@ export const KNOWN_TOKENS: readonly KnownToken[] = [
         decimals: 8,
         testnet: '0xb09fc29c112af8293539477e23d8df1d3126639642767d707277131352040cbb',
         mainnet: '',
+        biddingOnly: true,
     },
 ];

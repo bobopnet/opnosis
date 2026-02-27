@@ -14,6 +14,7 @@ const s = {
         ...card,
         borderLeft: `1px solid ${color.borderSubtle}`,
         maxWidth: '720px',
+        margin: '0 auto',
     } as React.CSSProperties,
     row: {
         display: 'grid',
@@ -63,17 +64,32 @@ const s = {
         background: 'rgba(245, 158, 11, 0.08)',
         border: '1px solid rgba(245, 158, 11, 0.2)',
         fontFamily: font.body,
-        fontSize: '14px',
+        fontSize: '15px',
     } as React.CSSProperties,
     checkbox: {
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         color: color.textSecondary,
-        fontSize: '14px',
+        fontSize: '15px',
         fontFamily: font.body,
         marginBottom: '16px',
         cursor: 'pointer',
+    } as React.CSSProperties,
+    dualInput: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    } as React.CSSProperties,
+    shortInput: {
+        ...inputStyle,
+        width: '56px',
+        textAlign: 'center' as const,
+    } as React.CSSProperties,
+    unitLabel: {
+        fontFamily: font.body,
+        fontSize: '14px',
+        color: color.textSecondary,
     } as React.CSSProperties,
     feeInfo: {
         color: color.amber,
@@ -83,7 +99,7 @@ const s = {
         background: 'rgba(232, 148, 26, 0.06)',
         border: `1px solid rgba(232, 148, 26, 0.15)`,
         fontFamily: font.body,
-        fontSize: '14px',
+        fontSize: '15px',
     } as React.CSSProperties,
 };
 
@@ -99,12 +115,14 @@ const feePercent = `${Number(FEE_NUMERATOR * 100n) / Number(FEE_DENOMINATOR)}%`;
 export function CreateAuction({ connected, network, opnosis, onCreated }: Props) {
     const [auctioningToken, setAuctioningToken] = useState('');
     const [biddingToken, setBiddingToken] = useState('');
-    const [sellAmount, setSellAmount] = useState('');
-    const [minBuyAmount, setMinBuyAmount] = useState('');
-    const [minBidPerOrder, setMinBidPerOrder] = useState('');
+    const [sellAmount, setSellAmount] = useState('0');
+    const [minBuyAmount, setMinBuyAmount] = useState('0');
+    const [minBidPerOrder, setMinBidPerOrder] = useState('0');
     const [minFunding, setMinFunding] = useState('0');
-    const [cancellationMinutes, setCancellationMinutes] = useState('60');
-    const [auctionMinutes, setAuctionMinutes] = useState('120');
+    const [cancelDays, setCancelDays] = useState('0');
+    const [cancelHours, setCancelHours] = useState('1');
+    const [auctionDays, setAuctionDays] = useState('1');
+    const [auctionHours, setAuctionHours] = useState('0');
     const [atomicClose, setAtomicClose] = useState(false);
     const [step, setStep] = useState<'approve' | 'create'>('approve');
 
@@ -118,11 +136,13 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
     const handleCreate = async () => {
         const nowSec = BigInt(Math.floor(Date.now() / 1000));
+        const cancelSec = BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n;
+        const auctionSec = BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n;
         const ok = await createAuction({
             auctioningToken,
             biddingToken,
-            cancellationEndDate: nowSec + BigInt(parseInt(cancellationMinutes, 10)) * 60n,
-            auctionEndDate: nowSec + BigInt(parseInt(auctionMinutes, 10)) * 60n,
+            cancellationEndDate: nowSec + cancelSec,
+            auctionEndDate: nowSec + auctionSec,
             auctionedSellAmount: parseTokenAmount(sellAmount),
             minBuyAmount: parseTokenAmount(minBuyAmount),
             minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0'),
@@ -158,6 +178,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     value={auctioningToken}
                     onChange={setAuctioningToken}
                     network={network}
+                    excludeBiddingOnly
                 />
                 <TokenSelect
                     label="Bidding Token"
@@ -189,12 +210,22 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Cancel Window (minutes)<HelpTip text="Minutes from now during which bidders can cancel orders. After this, all bids are final." /></label>
-                    <input style={inputStyle} type="number" value={cancellationMinutes} onChange={(e) => setCancellationMinutes(e.target.value)} />
+                    <label style={labelStyle}>Cancel Window<HelpTip text="Time from now during which bidders can cancel orders. After this, all bids are final." /></label>
+                    <div style={s.dualInput}>
+                        <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value)} />
+                        <span style={s.unitLabel}>days</span>
+                        <input style={s.shortInput} type="number" min="0" max="23" value={cancelHours} onChange={(e) => setCancelHours(e.target.value)} />
+                        <span style={s.unitLabel}>hours</span>
+                    </div>
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Auction Duration (minutes)<HelpTip text="Minutes from now the auction accepts bids. After this, the auction can be settled." /></label>
-                    <input style={inputStyle} type="number" value={auctionMinutes} onChange={(e) => setAuctionMinutes(e.target.value)} />
+                    <label style={labelStyle}>Auction Duration<HelpTip text="Time from now the auction accepts bids. After this, the auction can be settled." /></label>
+                    <div style={s.dualInput}>
+                        <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value)} />
+                        <span style={s.unitLabel}>days</span>
+                        <input style={s.shortInput} type="number" min="0" max="23" value={auctionHours} onChange={(e) => setAuctionHours(e.target.value)} />
+                        <span style={s.unitLabel}>hours</span>
+                    </div>
                 </div>
             </div>
             <label style={s.checkbox}>

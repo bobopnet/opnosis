@@ -21,8 +21,8 @@ export const color = {
     purpleDeep: '#3d1a4a',
 
     textPrimary: '#f0ece4',
-    textSecondary: '#a09b90',
-    textMuted: '#6b6560',
+    textSecondary: '#c0bbb0',
+    textMuted: '#8a8478',
 
     success: '#10b981',
     error: '#ef4444',
@@ -128,7 +128,7 @@ export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple'): React.
 
 export const label: React.CSSProperties = {
     color: color.textSecondary,
-    fontSize: '13px',
+    fontSize: '15px',
     fontFamily: font.body,
     marginBottom: '6px',
     display: 'block',

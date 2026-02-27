@@ -43,11 +43,14 @@ interface Props {
     readonly network: string;
     readonly label: string;
     readonly help?: string;
+    /** Hide tokens marked as biddingOnly (e.g. for the auctioning token selector). */
+    readonly excludeBiddingOnly?: boolean;
 }
 
 /** Filter tokens that have an address for the current network. */
-function tokensForNetwork(network: string): KnownToken[] {
+function tokensForNetwork(network: string, excludeBiddingOnly?: boolean): KnownToken[] {
     return KNOWN_TOKENS.filter((t) => {
+        if (excludeBiddingOnly && t.biddingOnly) return false;
         const addr = network === 'mainnet' ? t.mainnet : t.testnet;
         return addr.length > 0;
     });
@@ -58,8 +61,8 @@ function tokenAddress(token: KnownToken, network: string): string {
     return network === 'mainnet' ? token.mainnet : token.testnet;
 }
 
-export function TokenSelect({ value, onChange, network, label, help }: Props) {
-    const available = tokensForNetwork(network);
+export function TokenSelect({ value, onChange, network, label, help, excludeBiddingOnly }: Props) {
+    const available = tokensForNetwork(network, excludeBiddingOnly);
 
     // Determine if current value matches a known token
     const matchedSymbol = available.find((t) => tokenAddress(t, network) === value)?.symbol ?? null;

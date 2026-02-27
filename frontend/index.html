@@ -27,8 +27,8 @@
                 --purple-deep: #3d1a4a;
 
                 --text-primary: #f0ece4;
-                --text-secondary: #a09b90;
-                --text-muted: #6b6560;
+                --text-secondary: #c0bbb0;
+                --text-muted: #8a8478;
 
                 --success: #10b981;
                 --error: #ef4444;
@@ -43,6 +43,10 @@
                 -moz-osx-font-smoothing: grayscale;
             }
             select, input, textarea, button { font-family: inherit; }
+            input::placeholder { color: var(--text-secondary); opacity: 1; }
+            input[type="number"]::-webkit-outer-spin-button,
+            input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            input[type="number"] { -moz-appearance: textfield; }
             ::selection { background: rgba(232, 148, 26, 0.3); color: #fff; }
 
             /* Scrollbar styling */
