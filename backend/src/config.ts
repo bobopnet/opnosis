@@ -18,6 +18,9 @@ export const config = {
     rpcUrl: process.env['OPNET_RPC_URL'] ?? networkConfig.rpcUrl,
     cacheTtlMs: parseInt(process.env['CACHE_TTL_MS'] ?? '30000', 10),
     indexerPollMs: parseInt(process.env['INDEXER_POLL_MS'] ?? '15000', 10),
+    nativeSwapAddress: process.env['NATIVE_SWAP_ADDRESS'] ?? '',
+    motoAddress: process.env['MOTO_ADDRESS'] ?? '',
+    motoswapRouterAddress: process.env['MOTOSWAP_ROUTER_ADDRESS'] ?? '',
 } as const;
 
 export const provider: AbstractRpcProvider = new JSONRpcProvider({

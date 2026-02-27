@@ -25,7 +25,7 @@ const contract = new OpnosisContract(
 
 const cache = new Cache(config.cacheTtlMs);
 
-startIndexer(contract, cache, config.indexerPollMs);
+startIndexer(contract, cache, config.indexerPollMs, provider, networkConfig.btcNetwork);
 
 // -- HTTP server ---------------------------------------------------------------
 
@@ -70,14 +70,14 @@ app.get('/health', (_req, res) => {
 
 // -- GET /stats ----------------------------------------------------------------
 
-app.get('/stats', (_req, res) => {
+app.get('/stats', async (_req, res) => {
     const cacheKey = 'stats';
-    const cached = cache.get<ReturnType<typeof getStats>>(cacheKey);
+    const cached = cache.get<Awaited<ReturnType<typeof getStats>>>(cacheKey);
     if (cached) {
         res.json(cached);
         return;
     }
-    const stats = getStats();
+    const stats = await getStats();
     cache.set(cacheKey, stats);
     res.json(stats);
 });
