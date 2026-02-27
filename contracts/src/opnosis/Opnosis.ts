@@ -25,7 +25,7 @@
  * Storage pointer layout (each u16, sequential via Blockchain.nextPointer):
  *   0  pAuctionCount      — global auction ID counter
  *   1  pUserCount         — global user ID counter
- *   2  pGlobalFeeNum      — protocol fee numerator (0–15 of 1000)
+ *   2  pGlobalFeeNum      — protocol fee numerator (0–15 of 1000, i.e. max 1.5%)
  *   3  pFeeReceiver       — protocol fee receiver address (as u256)
  *   4  pAuctioningToken   — map: auctionId → auctioning token address
  *   5  pBiddingToken      — map: auctionId → bidding token address

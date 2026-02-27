@@ -23,7 +23,7 @@ export const MAX_ORDERS = 100;
  *   setFeeParameters(1n, feeReceiverAddress)
  * where 1/1000 = 0.1%.  Fee is deducted from the sell amount at settlement.
  */
-export const FEE_DENOMINATOR = 1000n;
+export const FEE_DENOMINATOR = 1_000n;
 
 /** Default fee numerator (0.1% = 1/1000). Set via setFeeParameters after deploy. */
 export const FEE_NUMERATOR = 1n;
