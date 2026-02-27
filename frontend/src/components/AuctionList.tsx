@@ -518,17 +518,15 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
 
     return (
         <>
+            <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Open Auctions</div>
             {upcoming.length > 0 && (
                 <>
-                    <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Upcoming Auctions</div>
+                    <div style={{ ...sectionTitleStyle, marginBottom: '16px', fontSize: '16px' }}>Upcoming</div>
                     <div style={{ ...s.grid, marginBottom: '32px' }}>{upcoming.map(renderCard)}</div>
                 </>
             )}
             {rest.length > 0 && (
-                <>
-                    {upcoming.length > 0 && <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Active Auctions</div>}
-                    <div style={s.grid}>{rest.map(renderCard)}</div>
-                </>
+                <div style={s.grid}>{rest.map(renderCard)}</div>
             )}
         </>
     );
