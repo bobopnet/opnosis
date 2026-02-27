@@ -57,11 +57,6 @@ const s = {
         color: color.textPrimary,
         fontSize: '13px',
     } as React.CSSProperties,
-    auctionId: {
-        color: color.textMuted,
-        fontSize: '11px',
-        fontFamily: font.body,
-    } as React.CSSProperties,
 };
 
 /* ── Types ─────────────────────────────────────────────────────────── */
@@ -122,6 +117,8 @@ export function MyBids({ connected, opnosis }: Props) {
                     }
                 }));
 
+                // Most recent bids first (highest auction ID, then highest order ID)
+                allRows.sort((a, b) => Number(b.auction.id) - Number(a.auction.id) || b.order.orderId - a.order.orderId);
                 if (!cancelled) setRows(allRows);
             } catch {
                 if (!cancelled) setRows([]);
@@ -231,10 +228,9 @@ export function MyBids({ connected, opnosis }: Props) {
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
                                     <td style={s.td}>
                                         <div style={s.auctionName}>{a.auctioningTokenName || 'Auction'}</div>
-                                        <div style={s.auctionId}>#{a.id}</div>
                                     </td>
-                                    <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount))} {a.biddingTokenSymbol}</td>
-                                    <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount))} {a.auctioningTokenSymbol}</td>
+                                    <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount)).split('.')[0]} {a.biddingTokenSymbol}</td>
+                                    <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount)).split('.')[0]} {a.auctioningTokenSymbol}</td>
                                     <td style={s.td}><span style={badgeStyle(statusVariant)}>{statusText}</span></td>
                                     <td style={s.td}>
                                         {canCancel && (

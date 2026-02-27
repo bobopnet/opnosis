@@ -181,7 +181,7 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
             const sim = await contract.simulateCancelSellOrders(auctionId, orderIds);
             setTxState({ status: 'pending', message: 'Confirm in OP_WALLET...' });
             await sendSimulation(sim);
-            setTxState({ status: 'success', message: 'Orders cancelled!' });
+            setTxState({ status: 'success', message: 'Order cancelled!' });
             return true;
         } catch (err) {
             setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });

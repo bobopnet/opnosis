@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount, formatTimestamp, formatPrice, parseTokenAmount } from '@opnosis/shared';
 import {
-    color, font, card, btnPrimary, btnSecondary, btnDisabled, input as inputStyle,
+    color, font, card, btnPrimary, btnDisabled, input as inputStyle,
     label as labelStyle, sectionTitle as sectionTitleStyle, statusMsg, dismissBtn, badge as badgeStyle,
 } from '../styles.js';
-import type { IndexedAuction, IndexedClearing, IndexedOrder } from '../types.js';
+import type { IndexedAuction, IndexedClearing } from '../types.js';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
 
 const s = {
@@ -131,12 +131,11 @@ function statusLabel(status: string): string {
 
 interface Props {
     readonly connected: boolean;
-    readonly walletAddress: string;
     readonly opnosis: ReturnType<typeof useOpnosis>;
     readonly refreshKey?: number;
 }
 
-export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: Props) {
+export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [loading, setLoading] = useState(true);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -152,10 +151,8 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
     const [extendAuctionEnd, setExtendAuctionEnd] = useState('');
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
     const [clearing, setClearing] = useState<IndexedClearing | null>(null);
-    const [myOrders, setMyOrders] = useState<IndexedOrder[]>([]);
-    const [ordersLoading, setOrdersLoading] = useState(false);
 
-    const { txState, resetTx, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
+    const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
 
     /* Reset form state when expanded card changes */
@@ -168,7 +165,6 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
         setExtendAuctionEnd('');
         setBiddingTokenUsdPrice(null);
         setClearing(null);
-        setMyOrders([]);
         resetTx();
     }, [expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -234,32 +230,6 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
         return () => { cancelled = true; };
     }, [expandedId, auctions]);
 
-    /* Fetch orders for the expanded auction when wallet is connected */
-    useEffect(() => {
-        if (!expandedId || !connected) {
-            setMyOrders([]);
-            return;
-        }
-        let cancelled = false;
-        setOrdersLoading(true);
-        async function loadOrders() {
-            try {
-                const res = await fetch(`${API_BASE_URL}/auctions/${expandedId}/orders`);
-                if (!res.ok) return;
-                const data = await res.json() as IndexedOrder[];
-                if (!cancelled) {
-                    const mine = data.filter((o) => hexAddress && o.userAddress.toLowerCase() === hexAddress.toLowerCase());
-                    setMyOrders(mine);
-                }
-            } catch {
-                // orders unavailable
-            } finally {
-                if (!cancelled) setOrdersLoading(false);
-            }
-        }
-        void loadOrders();
-        return () => { cancelled = true; };
-    }, [expandedId, connected, walletAddress, fetchKey]);
 
     const refresh = () => setFetchKey((k) => k + 1);
 
@@ -325,24 +295,6 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
     const handleClaim = async (auction: IndexedAuction) => {
         const ids = claimOrderIds.split(',').map((v) => BigInt(v.trim())).filter((n) => n > 0n);
         if (ids.length === 0) return;
-        const ok = await claimOrders(BigInt(auction.id), ids);
-        if (ok) refresh();
-    };
-
-    const handleCancelOrder = async (auction: IndexedAuction, orderId: number) => {
-        const ok = await cancelOrders(BigInt(auction.id), [BigInt(orderId)]);
-        if (ok) refresh();
-    };
-
-    const handleClaimOrder = async (auction: IndexedAuction, orderId: number) => {
-        const ok = await claimOrders(BigInt(auction.id), [BigInt(orderId)]);
-        if (ok) refresh();
-    };
-
-    const handleClaimMyOrders = async (auction: IndexedAuction) => {
-        const claimable = myOrders.filter((o) => !o.cancelled && !o.claimed);
-        if (claimable.length === 0) return;
-        const ids = claimable.map((o) => BigInt(o.orderId));
         const ok = await claimOrders(BigInt(auction.id), ids);
         if (ok) refresh();
     };
@@ -506,73 +458,6 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
                     >{busy ? 'Settling...' : 'Settle Auction'}</button>
-                </div>
-            )}
-
-            {/* My Bids */}
-            {connected && (
-                <div style={s.section}>
-                    <div style={sectionTitleStyle}>My Bids</div>
-                    {ordersLoading ? (
-                        <div style={{ color: color.textSecondary, fontFamily: font.body, fontSize: '13px' }}>Loading orders...</div>
-                    ) : myOrders.length === 0 ? (
-                        <div style={{ color: color.textMuted, fontFamily: font.body, fontSize: '13px' }}>No bids placed yet.</div>
-                    ) : (
-                        <>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font.body, fontSize: '13px' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: `1px solid ${color.borderSubtle}`, color: color.textSecondary, textAlign: 'left' }}>
-                                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>#</th>
-                                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>Bid ({a.biddingTokenSymbol})</th>
-                                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>Min Receive ({a.auctioningTokenSymbol})</th>
-                                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>Status</th>
-                                        <th style={{ padding: '6px 8px', fontWeight: 600 }}>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {myOrders.map((o) => {
-                                        const canCancel = !a.isSettled && a.status !== 'ended' && (a.status === 'open') && !o.cancelled && !o.claimed;
-                                        const canClaim = a.isSettled && !o.cancelled && !o.claimed;
-                                        let statusText = 'Active';
-                                        let statusVariant: 'amber' | 'success' | 'muted' = 'amber';
-                                        if (o.cancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
-                                        else if (o.claimed) { statusText = 'Claimed'; statusVariant = 'success'; }
-                                        return (
-                                            <tr key={o.orderId} style={{ borderBottom: `1px solid ${color.borderSubtle}` }}>
-                                                <td style={{ padding: '8px', color: color.textPrimary }}>{o.orderId}</td>
-                                                <td style={{ padding: '8px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.sellAmount))}</td>
-                                                <td style={{ padding: '8px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.buyAmount))}</td>
-                                                <td style={{ padding: '8px' }}><span style={badgeStyle(statusVariant)}>{statusText}</span></td>
-                                                <td style={{ padding: '8px' }}>
-                                                    {canCancel && (
-                                                        <button
-                                                            style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
-                                                            disabled={busy}
-                                                            onClick={(e) => { e.stopPropagation(); void handleCancelOrder(a, o.orderId); }}
-                                                        >Cancel</button>
-                                                    )}
-                                                    {canClaim && (
-                                                        <button
-                                                            style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
-                                                            disabled={busy}
-                                                            onClick={(e) => { e.stopPropagation(); void handleClaimOrder(a, o.orderId); }}
-                                                        >Claim</button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                            {a.isSettled && myOrders.some((o) => !o.cancelled && !o.claimed) && (
-                                <button
-                                    style={{ ...btnPrimary, marginTop: '12px', ...(busy ? btnDisabled : {}) }}
-                                    disabled={busy}
-                                    onClick={(e) => { e.stopPropagation(); void handleClaimMyOrders(a); }}
-                                >{busy ? 'Claiming...' : 'Claim All'}</button>
-                            )}
-                        </>
-                    )}
                 </div>
             )}
 
