@@ -3,6 +3,10 @@
         "opnosis": {
             "outFile": "build/Opnosis.wasm",
             "use": ["abort=src/opnosis/index/abort"]
+        },
+        "orange-coin": {
+            "outFile": "build/OrangeCoin.wasm",
+            "use": ["abort=src/orange-coin/index/abort"]
         }
     },
     "options": {

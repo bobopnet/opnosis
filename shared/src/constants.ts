@@ -13,6 +13,10 @@ function env(key: string): string {
 /** Contract address — set via environment or override at import site. */
 export const OPNOSIS_ADDRESS: string = env('OPNOSIS_CONTRACT') || env('VITE_OPNOSIS_CONTRACT');
 
+/** OrangeCoin (ORNGE) test token address. */
+export const TOKEN_ADDRESS: string =
+    env('TOKEN_ADDRESS') || env('VITE_TOKEN_ADDRESS') || 'opt1sqq63k7dtmenxhzpmqhf58rwjr9ad4rgxygetsxye';
+
 /** Maximum orders per auction (matches contract MAX_ORDERS). */
 export const MAX_ORDERS = 100;
 

@@ -1,7 +1,7 @@
 /**
- * Deploy Opnosis contract to testnet.
+ * Deploy OrangeCoin (ORNGE) OP20 token to testnet.
  *
- * Usage: npx tsx scripts/deploy.ts
+ * Usage: npx tsx scripts/deploy-token.ts
  */
 
 import 'dotenv/config';
@@ -70,9 +70,9 @@ if (utxos.length === 0) {
 }
 
 // Read WASM bytecode
-const wasmPath = path.resolve(__dirname, '../contracts/build/Opnosis.wasm');
+const wasmPath = path.resolve(__dirname, '../contracts/build/OrangeCoin.wasm');
 if (!fs.existsSync(wasmPath)) {
-    console.error(`WASM not found at ${wasmPath}. Run: cd contracts && npm run build`);
+    console.error(`WASM not found at ${wasmPath}. Run: cd contracts && npm run build:token`);
     process.exit(1);
 }
 const bytecode = fs.readFileSync(wasmPath);
@@ -117,8 +117,8 @@ console.log('Broadcasting reveal TX...');
 const revealResult = await provider.sendRawTransaction(deployment.transaction[1]);
 console.log(`Reveal TX  : ${revealResult.result} (${revealResult.peers} peers)`);
 
-console.log('\n=== Deployment successful ===');
-console.log(`Contract: ${deployment.contractAddress}`);
+console.log('\n=== OrangeCoin (ORNGE) Deployment successful ===');
+console.log(`Token address: ${deployment.contractAddress}`);
 console.log('\nUpdate your config:');
-console.log(`  shared/src/constants.ts -> OPNOSIS_ADDRESS = '${deployment.contractAddress}'`);
-console.log(`  .env                    -> CONTRACT_ADDRESS=${deployment.contractAddress}`);
+console.log(`  shared/src/constants.ts -> TOKEN_ADDRESS = '${deployment.contractAddress}'`);
+console.log(`  .env                    -> TOKEN_ADDRESS=${deployment.contractAddress}`);
