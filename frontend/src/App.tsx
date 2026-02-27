@@ -27,7 +27,7 @@ const s = {
         top: 0,
         left: '50%',
         transform: 'translateX(-50%)',
-        height: '100vh',
+        height: '115vh',
         width: 'auto',
         opacity: 0.35,
         pointerEvents: 'none',
