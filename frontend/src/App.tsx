@@ -22,6 +22,18 @@ const s = {
         display: 'flex',
         flexDirection: 'column',
         background: `radial-gradient(ellipse at 50% 0%, rgba(107, 45, 123, 0.08) 0%, transparent 60%), ${color.bgDeep}`,
+        position: 'relative' as const,
+    } as React.CSSProperties,
+    pageBg: {
+        position: 'fixed',
+        top: 0,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        height: '100vh',
+        width: 'auto',
+        opacity: 0.20,
+        pointerEvents: 'none',
+        zIndex: 0,
     } as React.CSSProperties,
 
     /* Header */
@@ -107,6 +119,8 @@ const s = {
         margin: '0 auto',
         padding: '0 32px',
         flex: 1,
+        position: 'relative' as const,
+        zIndex: 1,
     } as React.CSSProperties,
 
     /* Hero */
@@ -275,6 +289,7 @@ export function App() {
 
     return (
         <div style={s.page}>
+            <img src="/opnosis-avatar.svg" alt="" style={s.pageBg} />
             {/* ── Header ──────────────────────────────────────── */}
             <header style={s.header}>
                 <div style={s.logoArea}>
