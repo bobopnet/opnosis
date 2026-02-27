@@ -15,6 +15,10 @@
                     "type": "ADDRESS"
                 },
                 {
+                    "name": "orderPlacementStartDate",
+                    "type": "UINT256"
+                },
+                {
                     "name": "cancellationEndDate",
                     "type": "UINT256"
                 },
@@ -214,6 +218,7 @@
             "outputs": [
                 { "name": "auctioningToken", "type": "ADDRESS" },
                 { "name": "biddingToken", "type": "ADDRESS" },
+                { "name": "orderPlacementStartDate", "type": "UINT256" },
                 { "name": "cancellationEndDate", "type": "UINT256" },
                 { "name": "auctionEndDate", "type": "UINT256" },
                 { "name": "auctionedSellAmount", "type": "UINT256" },

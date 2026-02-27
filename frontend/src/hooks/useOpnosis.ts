@@ -22,6 +22,7 @@ interface UseOpnosisReturn {
     readonly createAuction: (params: {
         auctioningToken: string;
         biddingToken: string;
+        orderPlacementStartDate: bigint;
         cancellationEndDate: bigint;
         auctionEndDate: bigint;
         auctionedSellAmount: bigint;
@@ -68,6 +69,7 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
             const sim = await contract.simulateInitiateAuction(
                 params.auctioningToken,
                 params.biddingToken,
+                params.orderPlacementStartDate,
                 params.cancellationEndDate,
                 params.auctionEndDate,
                 params.auctionedSellAmount,

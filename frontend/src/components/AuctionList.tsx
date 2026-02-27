@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
-import { formatTokenAmount } from '@opnosis/shared';
-import { color, font, card, badge as badgeStyle } from '../styles.js';
+import { formatTokenAmount, formatTimestamp } from '@opnosis/shared';
+import { color, font, card, badge as badgeStyle, sectionTitle as sectionTitleStyle } from '../styles.js';
 import type { IndexedAuction } from '../types.js';
 
 const s = {
@@ -56,6 +56,7 @@ const s = {
 };
 
 function statusBadge(status: string): React.CSSProperties {
+    if (status === 'upcoming') return badgeStyle('purple');
     if (status === 'open') return badgeStyle('amber');
     if (status === 'settled') return badgeStyle('success');
     return badgeStyle('muted');
@@ -92,37 +93,63 @@ export function AuctionList({ onSelect, refreshKey }: Props) {
     if (loading) return <div style={s.loading}>Loading auctions...</div>;
     if (auctions.length === 0) return <div style={s.empty}>No auctions found</div>;
 
-    return (
-        <div style={s.grid}>
-            {auctions.map((a) => {
-                const isHovered = hoveredId === a.id;
-                return (
-                    <div
-                        key={a.id}
-                        style={{
-                            ...s.card,
-                            ...(isHovered ? {
-                                transform: 'translateY(-2px)',
-                                boxShadow: '0 8px 24px rgba(232, 148, 26, 0.12)',
-                            } : {}),
-                        }}
-                        onClick={() => onSelect(a.id)}
-                        onMouseEnter={() => setHoveredId(a.id)}
-                        onMouseLeave={() => setHoveredId(null)}
-                    >
-                        <div style={s.cardHeader}>
-                            <span style={s.cardTitle}>Auction #{a.id}</span>
-                            <span style={statusBadge(a.status)}>{a.status}</span>
-                        </div>
-                        <div style={s.label}>Sell Amount</div>
-                        <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount))}</div>
-                        <div style={s.label}>Min Buy Amount</div>
-                        <div style={s.value}>{formatTokenAmount(BigInt(a.minBuyAmount))}</div>
+    const upcoming = auctions.filter((a) => a.status === 'upcoming');
+    const rest = auctions.filter((a) => a.status !== 'upcoming');
+
+    const renderCard = (a: IndexedAuction) => {
+        const isHovered = hoveredId === a.id;
+        const isUpcoming = a.status === 'upcoming';
+        return (
+            <div
+                key={a.id}
+                style={{
+                    ...s.card,
+                    ...(isHovered ? {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 8px 24px rgba(232, 148, 26, 0.12)',
+                    } : {}),
+                }}
+                onClick={() => onSelect(a.id)}
+                onMouseEnter={() => setHoveredId(a.id)}
+                onMouseLeave={() => setHoveredId(null)}
+            >
+                <div style={s.cardHeader}>
+                    <span style={s.cardTitle}>Auction #{a.id}</span>
+                    <span style={statusBadge(a.status)}>{a.status}</span>
+                </div>
+                <div style={s.label}>Sell Amount</div>
+                <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount))}</div>
+                <div style={s.label}>Min Buy Amount</div>
+                <div style={s.value}>{formatTokenAmount(BigInt(a.minBuyAmount))}</div>
+                {isUpcoming ? (
+                    <>
+                        <div style={s.label}>Bidding Starts</div>
+                        <div style={s.value}>{formatTimestamp(BigInt(a.orderPlacementStartDate))}</div>
+                    </>
+                ) : (
+                    <>
                         <div style={s.label}>Orders</div>
                         <div style={s.value}>{a.orderCount} / 100</div>
-                    </div>
-                );
-            })}
-        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <>
+            {upcoming.length > 0 && (
+                <>
+                    <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Upcoming Auctions</div>
+                    <div style={{ ...s.grid, marginBottom: '32px' }}>{upcoming.map(renderCard)}</div>
+                </>
+            )}
+            {rest.length > 0 && (
+                <>
+                    {upcoming.length > 0 && <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Active Auctions</div>}
+                    <div style={s.grid}>{rest.map(renderCard)}</div>
+                </>
+            )}
+        </>
     );
 }

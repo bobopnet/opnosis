@@ -119,6 +119,8 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [minBuyAmount, setMinBuyAmount] = useState('0');
     const [minBidPerOrder, setMinBidPerOrder] = useState('0');
     const [minFunding, setMinFunding] = useState('0');
+    const [startMode, setStartMode] = useState<'now' | 'schedule'>('now');
+    const [scheduledStart, setScheduledStart] = useState('');
     const [cancelDays, setCancelDays] = useState('0');
     const [cancelHours, setCancelHours] = useState('1');
     const [auctionDays, setAuctionDays] = useState('1');
@@ -138,11 +140,21 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         const nowSec = BigInt(Math.floor(Date.now() / 1000));
         const cancelSec = BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n;
         const auctionSec = BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n;
+
+        let orderPlacementStartDate = 0n;
+        let baseTime = nowSec;
+        if (startMode === 'schedule' && scheduledStart) {
+            const startTs = BigInt(Math.floor(new Date(scheduledStart).getTime() / 1000));
+            orderPlacementStartDate = startTs;
+            baseTime = startTs;
+        }
+
         const ok = await createAuction({
             auctioningToken,
             biddingToken,
-            cancellationEndDate: nowSec + cancelSec,
-            auctionEndDate: nowSec + auctionSec,
+            orderPlacementStartDate,
+            cancellationEndDate: baseTime + cancelSec,
+            auctionEndDate: baseTime + auctionSec,
             auctionedSellAmount: parseTokenAmount(sellAmount),
             minBuyAmount: parseTokenAmount(minBuyAmount),
             minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0'),
@@ -208,9 +220,30 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
                 </div>
             </div>
+            <div style={s.field}>
+                <label style={labelStyle}>Start Mode<HelpTip text="Choose when bidding opens. 'Start Now' opens bidding immediately. 'Schedule Start' lets you set a future date." /></label>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                    <label style={s.checkbox}>
+                        <input type="radio" name="startMode" checked={startMode === 'now'} onChange={() => setStartMode('now')} />
+                        Start Now
+                    </label>
+                    <label style={s.checkbox}>
+                        <input type="radio" name="startMode" checked={startMode === 'schedule'} onChange={() => setStartMode('schedule')} />
+                        Schedule Start
+                    </label>
+                </div>
+                {startMode === 'schedule' && (
+                    <input
+                        style={{ ...inputStyle, colorScheme: 'dark' }}
+                        type="datetime-local"
+                        value={scheduledStart}
+                        onChange={(e) => setScheduledStart(e.target.value)}
+                    />
+                )}
+            </div>
             <div style={s.row}>
                 <div style={s.field}>
-                    <label style={labelStyle}>Cancel Window<HelpTip text="Time from now during which bidders can cancel orders. After this, all bids are final." /></label>
+                    <label style={labelStyle}>Cancel Window<HelpTip text={startMode === 'schedule' ? 'Time from scheduled start during which bidders can cancel orders.' : 'Time from now during which bidders can cancel orders. After this, all bids are final.'} /></label>
                     <div style={s.dualInput}>
                         <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value)} />
                         <span style={s.unitLabel}>days</span>
@@ -219,7 +252,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     </div>
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Auction Duration<HelpTip text="Time from now the auction accepts bids. After this, the auction can be settled." /></label>
+                    <label style={labelStyle}>Auction Duration<HelpTip text={startMode === 'schedule' ? 'Time from scheduled start the auction accepts bids.' : 'Time from now the auction accepts bids. After this, the auction can be settled.'} /></label>
                     <div style={s.dualInput}>
                         <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value)} />
                         <span style={s.unitLabel}>days</span>

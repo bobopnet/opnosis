@@ -21,6 +21,7 @@ interface OpnosisMethods {
     readonly initiateAuction: (
         auctioningToken: string,
         biddingToken: string,
+        orderPlacementStartDate: bigint,
         cancellationEndDate: bigint,
         auctionEndDate: bigint,
         auctionedSellAmount: bigint,
@@ -101,6 +102,7 @@ export class OpnosisContract {
     public async simulateInitiateAuction(
         auctioningToken: string,
         biddingToken: string,
+        orderPlacementStartDate: bigint,
         cancellationEndDate: bigint,
         auctionEndDate: bigint,
         auctionedSellAmount: bigint,
@@ -112,6 +114,7 @@ export class OpnosisContract {
         return this.#contract.initiateAuction(
             auctioningToken,
             biddingToken,
+            orderPlacementStartDate,
             cancellationEndDate,
             auctionEndDate,
             auctionedSellAmount,

@@ -59,6 +59,7 @@
  *  33  pLocked            — reentrancy guard (0 = unlocked, 1 = locked)
  *  34  pAuctionFeeReceiver — map: auctionId → fee receiver address snapshotted at initiation
  *  35  pOrderToRank       — map: orderKey(auctionId,orderId) → rank in sorted array (reverse index)
+ *  36  pOrderPlacementStart — map: auctionId → order placement start timestamp (0 = immediate)
  *
  * Composite key formula: orderKey(auctionId, subIdx) = auctionId * 10000 + subIdx
  *   • Safe for MAX_ORDERS = 100 (subIdx < 10000).
@@ -335,6 +336,12 @@ export class Opnosis extends OP_NET {
     private readonly pOrderToRank: u16 = Blockchain.nextPointer; // 35
     private readonly mapOrderToRank: StoredMapU256 = new StoredMapU256(this.pOrderToRank);
 
+    // Per-auction order placement start timestamp (0 = immediate) (pointer 36)
+    private readonly pOrderPlacementStart: u16 = Blockchain.nextPointer; // 36
+    private readonly mapOrderPlacementStart: StoredMapU256 = new StoredMapU256(
+        this.pOrderPlacementStart,
+    );
+
     public constructor() {
         super();
     }
@@ -369,12 +376,16 @@ export class Opnosis extends OP_NET {
 
     // ── Phase guards ─────────────────────────────────────────────────────────
 
-    /** Revert if auction is not in the order-placement phase (before auctionEndDate). */
+    /** Revert if auction is not in the order-placement phase (before auctionEndDate, after startDate). */
     private requireOrderPlacement(auctionId: u256): void {
         if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
             throw new Revert('Opnosis: auction does not exist');
         }
         const now = u256.fromU64(Blockchain.block.medianTimestamp);
+        const startDate = this.mapOrderPlacementStart.get(auctionId);
+        if (!u256.eq(startDate, u256.Zero) && now < startDate) {
+            throw new Revert('Opnosis: order placement has not started');
+        }
         if (now >= this.mapAuctionEnd.get(auctionId)) {
             throw new Revert('Opnosis: auction has ended');
         }
@@ -679,6 +690,7 @@ export class Opnosis extends OP_NET {
      *
      * @param auctioningToken           OP20 token being sold.
      * @param biddingToken              OP20 token accepted as bids.
+     * @param orderPlacementStartDate   Unix timestamp (seconds) at which bidding opens (0 = immediate).
      * @param cancellationEndDate       Unix timestamp (seconds) after which orders cannot be cancelled.
      * @param auctionEndDate            Unix timestamp (seconds) at which the auction ends.
      * @param auctionedSellAmount       Amount of auctioning tokens for sale.
@@ -693,6 +705,7 @@ export class Opnosis extends OP_NET {
     @method(
         { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
         { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
+        { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
         { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
         { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
         { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },
@@ -708,6 +721,7 @@ export class Opnosis extends OP_NET {
 
         const auctioningToken = calldata.readAddress();
         const biddingToken = calldata.readAddress();
+        const orderPlacementStartDate = calldata.readU256();
         const cancellationEndDate = calldata.readU256();
         const auctionEndDate = calldata.readU256();
         const auctionedSellAmount = calldata.readU256();
@@ -729,6 +743,10 @@ export class Opnosis extends OP_NET {
         const now = u256.fromU64(Blockchain.block.medianTimestamp);
         if (auctionEndDate <= now) {
             throw new Revert('Opnosis: auction end must be in the future');
+        }
+        // orderPlacementStartDate must be <= cancellationEndDate (if non-zero)
+        if (!u256.eq(orderPlacementStartDate, u256.Zero) && orderPlacementStartDate > cancellationEndDate) {
+            throw new Revert('Opnosis: order placement start exceeds cancellation end');
         }
         if (cancellationEndDate > auctionEndDate) {
             throw new Revert('Opnosis: cancellation end exceeds auction end');
@@ -763,6 +781,7 @@ export class Opnosis extends OP_NET {
         this.mapMinFunding.set(auctionId, minFundingThreshold);
         this.mapIsAtomic.set(auctionId, isAtomicClosureAllowed ? u256.One : u256.Zero);
         this.mapAuctioneerUserId.set(auctionId, userId);
+        this.mapOrderPlacementStart.set(auctionId, orderPlacementStartDate);
         this.mapOrderCount.set(auctionId, u256.Zero);
         this.mapSettled.set(auctionId, u256.Zero);
         this.mapFundingNotReached.set(auctionId, u256.Zero);
@@ -1316,9 +1335,10 @@ export class Opnosis extends OP_NET {
 
     /**
      * Return core auction data for the given auctionId.
-     * Fields (in order): auctioningToken, biddingToken, cancellationEndDate, auctionEndDate,
-     *   auctionedSellAmount, minBuyAmount, minBidPerOrder, feeNumerator, minFundingThreshold,
-     *   isAtomicClosureAllowed, orderCount, settled, fundingNotReached.
+     * Fields (in order): auctioningToken, biddingToken, orderPlacementStartDate,
+     *   cancellationEndDate, auctionEndDate, auctionedSellAmount, minBuyAmount, minBidPerOrder,
+     *   feeNumerator, minFundingThreshold, isAtomicClosureAllowed, orderCount, settled,
+     *   fundingNotReached.
      */
     @method({ name: 'auctionId', type: ABIDataTypes.UINT256 })
     @returns({ name: 'auctioningToken', type: ABIDataTypes.ADDRESS })
@@ -1332,6 +1352,7 @@ export class Opnosis extends OP_NET {
         const response = new BytesWriter(
             ADDRESS_BYTE_LENGTH + // auctioningToken
             ADDRESS_BYTE_LENGTH + // biddingToken
+            U256_BYTE_LENGTH +    // orderPlacementStartDate
             U256_BYTE_LENGTH +    // cancellationEndDate
             U256_BYTE_LENGTH +    // auctionEndDate
             U256_BYTE_LENGTH +    // auctionedSellAmount
@@ -1347,6 +1368,7 @@ export class Opnosis extends OP_NET {
 
         response.writeAddress(u256ToAddr(this.mapAuctioningToken.get(auctionId)));
         response.writeAddress(u256ToAddr(this.mapBiddingToken.get(auctionId)));
+        response.writeU256(this.mapOrderPlacementStart.get(auctionId));
         response.writeU256(this.mapCancellationEnd.get(auctionId));
         response.writeU256(this.mapAuctionEnd.get(auctionId));
         response.writeU256(this.mapSellAmount.get(auctionId));

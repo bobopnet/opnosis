@@ -166,7 +166,8 @@ export function AuctionDetail({ auctionId, connected, opnosis, onBack }: Props) 
         if (ok) refresh();
     };
 
-    const statusVariant = auction.status === 'open' ? 'amber' as const
+    const statusVariant = auction.status === 'upcoming' ? 'purple' as const
+        : auction.status === 'open' ? 'amber' as const
         : auction.status === 'settled' ? 'success' as const
         : 'muted' as const;
 
@@ -184,6 +185,9 @@ export function AuctionDetail({ auctionId, connected, opnosis, onBack }: Props) 
                 <div><div style={s.metaLabel}>Orders</div><div style={s.metaValue}>{auction.orderCount} / 100</div></div>
                 <div><div style={s.metaLabel}>Sell Amount</div><div style={s.metaValue}>{formatTokenAmount(BigInt(auction.auctionedSellAmount))}</div></div>
                 <div><div style={s.metaLabel}>Min Buy Amount</div><div style={s.metaValue}>{formatTokenAmount(BigInt(auction.minBuyAmount))}</div></div>
+                {BigInt(auction.orderPlacementStartDate) > 0n && (
+                    <div><div style={s.metaLabel}>Bidding Starts</div><div style={s.metaValue}>{formatTimestamp(BigInt(auction.orderPlacementStartDate))}</div></div>
+                )}
                 <div><div style={s.metaLabel}>Cancel Deadline</div><div style={s.metaValue}>{formatTimestamp(BigInt(auction.cancellationEndDate))}</div></div>
                 <div><div style={s.metaLabel}>Auction End</div><div style={s.metaValue}>{formatTimestamp(BigInt(auction.auctionEndDate))}</div></div>
                 <div><div style={s.metaLabel}>Auctioning Token</div><div style={s.tokenAddr}>{auction.auctioningToken}</div></div>
@@ -208,6 +212,16 @@ export function AuctionDetail({ auctionId, connected, opnosis, onBack }: Props) 
                             <div style={s.metaLabel}>Clearing Sell Amount</div>
                             <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingSellAmount))}</div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Upcoming notice */}
+            {auction.status === 'upcoming' && (
+                <div style={s.section}>
+                    <div style={sectionTitle}>Bidding Not Yet Open</div>
+                    <div style={{ color: color.textSecondary, fontFamily: font.body, fontSize: '15px' }}>
+                        Bidding starts {formatTimestamp(BigInt(auction.orderPlacementStartDate))}. Check back then to place your bid.
                     </div>
                 </div>
             )}

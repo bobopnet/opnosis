@@ -53,6 +53,7 @@ export interface AuctionData {
     readonly auctionId: bigint;
     readonly auctioningToken: string;
     readonly biddingToken: string;
+    readonly orderPlacementStartDate: bigint;
     readonly auctionEndDate: bigint;
     readonly cancellationEndDate: bigint;
     readonly auctionedSellAmount: bigint;
@@ -73,7 +74,7 @@ export interface ClearingData {
 
 // ─── UI types ─────────────────────────────────────────────────────────────────
 
-export type AuctionStatus = 'open' | 'cancellation_closed' | 'ended' | 'settled';
+export type AuctionStatus = 'upcoming' | 'open' | 'cancellation_closed' | 'ended' | 'settled';
 
 export interface WalletState {
     readonly connected: boolean;

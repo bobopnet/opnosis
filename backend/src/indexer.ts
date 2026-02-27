@@ -10,6 +10,7 @@ export interface IndexedAuction {
     readonly id: string;
     readonly auctioningToken: string;
     readonly biddingToken: string;
+    readonly orderPlacementStartDate: string;
     readonly auctionEndDate: string;
     readonly cancellationEndDate: string;
     readonly auctionedSellAmount: string;
@@ -31,6 +32,7 @@ export interface AuctionStats {
     readonly totalAuctions: number;
     readonly settledAuctions: number;
     readonly openAuctions: number;
+    readonly upcomingAuctions: number;
     readonly failedAuctions: number;
     readonly totalVolume: string;
     readonly totalOrdersPlaced: number;
@@ -52,19 +54,22 @@ function parseAuctionResult(auctionId: number, raw: any): IndexedAuction | null 
         if (!auctioningToken) return null;
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const orderPlacementStartDate = BigInt(r.orderPlacementStartDate ?? 0);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const auctionEndDate = BigInt(r.auctionEndDate ?? 0);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const cancellationEndDate = BigInt(r.cancellationEndDate ?? 0);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const isSettled = Boolean(r.isSettled ?? false);
 
-        const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled);
+        const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, undefined, orderPlacementStartDate);
 
         return {
             id: auctionId.toString(),
             auctioningToken,
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             biddingToken: String(r.biddingToken ?? ''),
+            orderPlacementStartDate: orderPlacementStartDate.toString(),
             auctionEndDate: auctionEndDate.toString(),
             cancellationEndDate: cancellationEndDate.toString(),
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -147,6 +152,7 @@ export function getAuction(id: number): IndexedAuction | undefined {
 export function getStats(): AuctionStats {
     let settledAuctions = 0;
     let openAuctions = 0;
+    let upcomingAuctions = 0;
     let failedAuctions = 0;
     let totalVolume = 0n;
     let totalOrdersPlaced = 0;
@@ -156,6 +162,8 @@ export function getStats(): AuctionStats {
         totalOrdersPlaced += Number(auction.orderCount);
         if (auction.status === 'settled') {
             settledAuctions++;
+        } else if (auction.status === 'upcoming') {
+            upcomingAuctions++;
         } else if (auction.status === 'open' || auction.status === 'cancellation_closed') {
             openAuctions++;
         } else if (auction.status === 'ended') {
@@ -170,6 +178,7 @@ export function getStats(): AuctionStats {
         totalAuctions: auctions.size,
         settledAuctions,
         openAuctions,
+        upcomingAuctions,
         failedAuctions,
         totalVolume: totalVolume.toString(),
         totalOrdersPlaced,

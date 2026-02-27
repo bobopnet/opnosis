@@ -131,6 +131,7 @@ export type GetAuctionData = CallResult<
     {
         auctioningToken: Address;
         biddingToken: Address;
+        orderPlacementStartDate: bigint;
         cancellationEndDate: bigint;
         auctionEndDate: bigint;
         auctionedSellAmount: bigint;
@@ -177,6 +178,7 @@ export interface IOpnosis extends IOP_NETContract {
     initiateAuction(
         auctioningToken: Address,
         biddingToken: Address,
+        orderPlacementStartDate: bigint,
         cancellationEndDate: bigint,
         auctionEndDate: bigint,
         auctionedSellAmount: bigint,

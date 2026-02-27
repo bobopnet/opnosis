@@ -14,6 +14,7 @@ export const OPNOSIS_ABI: BitcoinInterfaceAbi = [
         inputs: [
             { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
             { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
+            { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
             { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },
@@ -91,6 +92,7 @@ export const OPNOSIS_ABI: BitcoinInterfaceAbi = [
         outputs: [
             { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
             { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
+            { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
             { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },

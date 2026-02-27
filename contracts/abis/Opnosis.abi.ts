@@ -68,6 +68,7 @@ export const OpnosisAbi = [
         inputs: [
             { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
             { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
+            { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
             { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },
@@ -143,6 +144,7 @@ export const OpnosisAbi = [
         outputs: [
             { name: 'auctioningToken', type: ABIDataTypes.ADDRESS },
             { name: 'biddingToken', type: ABIDataTypes.ADDRESS },
+            { name: 'orderPlacementStartDate', type: ABIDataTypes.UINT256 },
             { name: 'cancellationEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionEndDate', type: ABIDataTypes.UINT256 },
             { name: 'auctionedSellAmount', type: ABIDataTypes.UINT256 },

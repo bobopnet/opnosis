@@ -230,24 +230,24 @@ const s = {
 
     /* Footer */
     footer: {
-        borderTop: `1px solid ${color.borderSubtle}`,
+        borderTop: `1px solid ${color.borderStrong}`,
         padding: '24px 32px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         gap: '24px',
         flexWrap: 'wrap' as const,
-        background: 'rgba(20, 20, 32, 0.5)',
+        background: 'rgba(30, 30, 46, 0.6)',
     } as React.CSSProperties,
     footerLink: {
         fontFamily: font.body,
         fontSize: '13px',
-        color: color.textMuted,
+        color: color.textSecondary,
         textDecoration: 'none',
         transition: 'color 0.2s',
     } as React.CSSProperties,
     footerSep: {
-        color: color.borderSubtle,
+        color: color.textMuted,
         fontSize: '12px',
     } as React.CSSProperties,
 };
@@ -372,6 +372,12 @@ export function App() {
                             <div style={s.statValue}>{stats.openAuctions}</div>
                             <div style={s.statLabel}>Open</div>
                         </div>
+                        {stats.upcomingAuctions > 0 && (
+                            <div style={s.statCard}>
+                                <div style={s.statValue}>{stats.upcomingAuctions}</div>
+                                <div style={s.statLabel}>Upcoming</div>
+                            </div>
+                        )}
                         <div style={s.statCard}>
                             <div style={s.statValue}>{formatTokenAmount(BigInt(stats.totalVolume))}</div>
                             <div style={s.statLabel}>Total Volume</div>

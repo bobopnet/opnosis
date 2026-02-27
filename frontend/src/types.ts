@@ -16,6 +16,7 @@ export interface AuctionStats {
     readonly totalAuctions: number;
     readonly settledAuctions: number;
     readonly openAuctions: number;
+    readonly upcomingAuctions: number;
     readonly failedAuctions: number;
     readonly totalVolume: string;
     readonly totalOrdersPlaced: number;
@@ -32,6 +33,7 @@ export interface IndexedAuction {
     readonly id: string;
     readonly auctioningToken: string;
     readonly biddingToken: string;
+    readonly orderPlacementStartDate: string;
     readonly auctionEndDate: string;
     readonly cancellationEndDate: string;
     readonly auctionedSellAmount: string;

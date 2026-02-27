@@ -143,9 +143,11 @@ const auctioningTokenAddr = Address.fromString(auctioningToken);
 const biddingTokenAddr = Address.fromString(biddingToken);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+const orderPlacementStartDate = 0n; // start immediately
 const auctionSim = await opnosis.initiateAuction(
     auctioningTokenAddr,
     biddingTokenAddr,
+    orderPlacementStartDate,
     cancellationEndDate,
     auctionEndDate,
     auctionedSellAmount,
