@@ -20,6 +20,7 @@ import { OPNOSIS_CONTRACT } from '../constants.js';
 interface UseOpnosisReturn {
     readonly txState: TxState;
     readonly resetTx: () => void;
+    readonly hexAddress: string;
     readonly createAuction: (params: {
         auctioningToken: string;
         biddingToken: string;
@@ -289,5 +290,7 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
         }
     }, [provider, btcNetwork, senderAddress]);
 
-    return { txState, resetTx, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
+    const hexAddress = senderAddress?.toString() ?? '';
+
+    return { txState, resetTx, hexAddress, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

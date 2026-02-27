@@ -375,7 +375,7 @@ export function App() {
                 {/* Tab content */}
                 <div ref={auctionsRef} style={s.content}>
                     {tab === 'browse' && <AuctionList connected={wallet.connected} walletAddress={wallet.address} opnosis={opnosis} refreshKey={refreshKey} />}
-                    {tab === 'mybids' && <MyBids connected={wallet.connected} walletAddress={wallet.address} opnosis={opnosis} />}
+                    {tab === 'mybids' && <MyBids connected={wallet.connected} opnosis={opnosis} />}
                     {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (
                         <CreateAuction

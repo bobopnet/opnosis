@@ -155,7 +155,7 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
     const [myOrders, setMyOrders] = useState<IndexedOrder[]>([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
 
-    const { txState, resetTx, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken } = opnosis;
+    const { txState, resetTx, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
 
     /* Reset form state when expanded card changes */
@@ -248,7 +248,7 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
                 if (!res.ok) return;
                 const data = await res.json() as IndexedOrder[];
                 if (!cancelled) {
-                    const mine = data.filter((o) => o.userAddress.toLowerCase() === walletAddress.toLowerCase());
+                    const mine = data.filter((o) => hexAddress && o.userAddress.toLowerCase() === hexAddress.toLowerCase());
                     setMyOrders(mine);
                 }
             } catch {
@@ -402,7 +402,7 @@ export function AuctionList({ connected, walletAddress, opnosis, refreshKey }: P
             )}
 
             {/* Extend Auction (auctioneer only, non-settled) */}
-            {!a.isSettled && connected && walletAddress && a.auctioneerAddress && walletAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
+            {!a.isSettled && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Extend Auction</div>
                     <div style={s.inputRow}>

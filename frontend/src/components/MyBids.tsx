@@ -73,25 +73,24 @@ interface BidRow {
 
 interface Props {
     readonly connected: boolean;
-    readonly walletAddress: string;
     readonly opnosis: ReturnType<typeof useOpnosis>;
 }
 
 /* ── Component ─────────────────────────────────────────────────────── */
 
-export function MyBids({ connected, walletAddress, opnosis }: Props) {
+export function MyBids({ connected, opnosis }: Props) {
     const [rows, setRows] = useState<BidRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchKey, setFetchKey] = useState(0);
 
-    const { txState, resetTx, cancelOrders, claimOrders } = opnosis;
+    const { txState, resetTx, cancelOrders, claimOrders, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
 
     const refresh = useCallback(() => setFetchKey((k) => k + 1), []);
 
     /* Fetch all auctions, then orders for each, filter by wallet */
     useEffect(() => {
-        if (!connected || !walletAddress) {
+        if (!connected || !hexAddress) {
             setRows([]);
             return;
         }
@@ -113,7 +112,7 @@ export function MyBids({ connected, walletAddress, opnosis }: Props) {
                         if (!oRes.ok) return;
                         const orders = await oRes.json() as IndexedOrder[];
                         const mine = orders.filter(
-                            (o) => o.userAddress.toLowerCase() === walletAddress.toLowerCase(),
+                            (o) => o.userAddress.toLowerCase() === hexAddress.toLowerCase(),
                         );
                         for (const order of mine) {
                             allRows.push({ auction, order });
@@ -133,7 +132,7 @@ export function MyBids({ connected, walletAddress, opnosis }: Props) {
 
         void load();
         return () => { cancelled = true; };
-    }, [connected, walletAddress, fetchKey]);
+    }, [connected, hexAddress, fetchKey]);
 
     const handleCancel = async (row: BidRow) => {
         const ok = await cancelOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);

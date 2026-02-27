@@ -375,6 +375,11 @@ export async function getOrdersData(
         const reader = raw?.result;
         if (!reader) return null;
 
+        // The SDK decodes ABI outputs and advances the reader offset.
+        // Reset to 0 so we can read the full binary response from the start.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        if (typeof reader.setOffset === 'function') reader.setOffset(0);
+
         // First u256 = orderCount
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         const orderCount = Number(reader.readU256() as bigint);
