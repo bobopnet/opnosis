@@ -269,7 +269,11 @@ const sections: Section[] = [
             },
             {
                 q: 'How do I claim my tokens after settlement?',
-                a: 'Once the auction is settled, go to the auction detail page. If you are a winning bidder, a "Claim" button will appear. Click it to receive your purchased tokens. If your bid did not win, you can claim a refund of your bidding tokens.',
+                a: <>
+                    Once the auction is settled, go to the <strong>My Bids</strong> tab. Each of your winning bids will show a <strong>Claim</strong> button. Click it to receive your purchased tokens. If you have multiple winning bids, you can use <strong>Claim All</strong> to claim them in one transaction.
+                    <br /><br />
+                    If your bid did not win, you can claim a refund of your bidding tokens from the same tab.
+                </>,
             },
         ],
     },
