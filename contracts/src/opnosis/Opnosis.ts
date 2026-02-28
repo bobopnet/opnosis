@@ -1261,6 +1261,10 @@ export class Opnosis extends OP_NET {
     /**
      * Claim tokens from one or more settled orders.
      *
+     * Anyone can call this for any orders — all tokens are transferred directly
+     * to the order owner, not the caller. This enables automatic distribution
+     * by the backend after settlement.
+     *
      * Token distribution rules (post-settlement):
      *
      *   fundingNotReached = true:
@@ -1285,8 +1289,8 @@ export class Opnosis extends OP_NET {
      * A cancelled order emits no claim event; it was already refunded at cancellation time.
      *
      * @param auctionId  The auction to claim from.
-     * @param orderIds   Array of order IDs owned by the caller to claim.
-     * @returns totalAuctioning  Total auctioning tokens sent to caller this call.
+     * @param orderIds   Array of order IDs to claim.
+     * @returns totalAuctioning  Total auctioning tokens distributed this call.
      */
     @method(
         { name: 'auctionId', type: ABIDataTypes.UINT256 },
@@ -1316,10 +1320,6 @@ export class Opnosis extends OP_NET {
         const totalOrders = u256ToU32(this.mapOrderCount.get(auctionId));
 
         const sender = Blockchain.tx.sender;
-        const callerUserId = this.mapAddrToUserId.get(addrToU256(sender));
-        if (u256.eq(callerUserId, u256.Zero)) {
-            throw new Revert('Opnosis: caller has no registered orders');
-        }
         if (orderIds.length > i32(MAX_ORDERS)) {
             throw new Revert('Opnosis: too many order IDs in one call');
         }
@@ -1327,7 +1327,6 @@ export class Opnosis extends OP_NET {
         const totalOrderCount = this.mapOrderCount.get(auctionId);
 
         let totalAuctioning: u256 = u256.Zero;
-        let totalBidding: u256 = u256.Zero;
 
         for (let i = 0; i < orderIds.length; i++) {
             const orderId = orderIds[i];
@@ -1337,10 +1336,8 @@ export class Opnosis extends OP_NET {
             }
             const key = orderKey(auctionId, orderId);
 
-            // Ownership check.
-            if (!u256.eq(this.mapOrderUser.get(key), callerUserId)) {
-                throw new Revert('Opnosis: not the order owner');
-            }
+            const orderUserId = this.mapOrderUser.get(key);
+
             // Already-claimed check.
             if (!u256.eq(this.mapClaimed.get(key), u256.Zero)) {
                 throw new Revert('Opnosis: order already claimed');
@@ -1351,12 +1348,12 @@ export class Opnosis extends OP_NET {
 
             // If cancelled: tokens were already returned at cancelSellOrders time.
             if (!u256.eq(this.mapOrderCancelled.get(key), u256.Zero)) {
-                // Emit zero-claim event so indexers can confirm the order is closed.
-                this.emitEvent(new ClaimedFromOrderEvent(auctionId, callerUserId, u256.Zero, u256.Zero));
+                this.emitEvent(new ClaimedFromOrderEvent(auctionId, orderUserId, u256.Zero, u256.Zero));
                 continue;
             }
 
             const orderSell = this.mapOrderSell.get(key);
+            const ownerAddr = u256ToAddr(this.mapUserIdToAddr.get(orderUserId));
             let auctioningAmt: u256 = u256.Zero;
             let biddingAmt: u256 = u256.Zero;
 
@@ -1394,20 +1391,19 @@ export class Opnosis extends OP_NET {
                 }
             }
 
+            // ── Transfer directly to order owner (anyone can trigger claims) ──
+            if (auctioningAmt > u256.Zero) {
+                TransferHelper.transfer(auctioningTokenAddr, ownerAddr, auctioningAmt);
+            }
+            if (biddingAmt > u256.Zero) {
+                TransferHelper.transfer(biddingTokenAddr, ownerAddr, biddingAmt);
+            }
+
             totalAuctioning = SafeMath.add(totalAuctioning, auctioningAmt);
-            totalBidding = SafeMath.add(totalBidding, biddingAmt);
 
             this.emitEvent(
-                new ClaimedFromOrderEvent(auctionId, callerUserId, auctioningAmt, biddingAmt),
+                new ClaimedFromOrderEvent(auctionId, orderUserId, auctioningAmt, biddingAmt),
             );
-        }
-
-        // ── Interactions ─────────────────────────────────────────────────────
-        if (totalAuctioning > u256.Zero) {
-            TransferHelper.transfer(auctioningTokenAddr, sender, totalAuctioning);
-        }
-        if (totalBidding > u256.Zero) {
-            TransferHelper.transfer(biddingTokenAddr, sender, totalBidding);
         }
 
         this.unlock();

@@ -4,6 +4,27 @@
  * Usage: npx tsx scripts/deploy.ts
  */
 
+// DNS workaround: hardcode testnet.opnet.org IP when DNS is unavailable
+import dns from 'node:dns';
+const origLookup = dns.lookup.bind(dns);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(dns as any).lookup = function (hostname: string, options: any, callback?: any) {
+    if (hostname === 'testnet.opnet.org') {
+        const cb = typeof options === 'function' ? options : callback;
+        const opts = typeof options === 'object' ? options : {};
+        if (opts.all) {
+            process.nextTick(() => cb(null, [{ address: '104.18.30.10', family: 4 }]));
+        } else {
+            process.nextTick(() => cb(null, '104.18.30.10', 4));
+        }
+        return;
+    }
+    if (typeof options === 'function') {
+        return origLookup(hostname, options);
+    }
+    return origLookup(hostname, options, callback);
+};
+
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';

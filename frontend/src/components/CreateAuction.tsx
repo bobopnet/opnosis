@@ -125,11 +125,15 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [scheduledStart, setScheduledStart] = useState('');
     const [cancelDays, setCancelDays] = useState('0');
     const [cancelHours, setCancelHours] = useState('0');
-    const [auctionDays, setAuctionDays] = useState('1');
+    const [cancelMinutes, setCancelMinutes] = useState('0');
+    const [auctionDays, setAuctionDays] = useState('0');
     const [auctionHours, setAuctionHours] = useState('0');
+    const [auctionMinutes, setAuctionMinutes] = useState('0');
     const [atomicClose, setAtomicClose] = useState(false);
-    const [step, setStep] = useState<'approve' | 'create'>('approve');
+    const [step, setStep] = useState<'ready' | 'approving' | 'creating'>('ready');
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
+    const [customAuctioningSymbol, setCustomAuctioningSymbol] = useState('');
+    const [customBiddingSymbol, setCustomBiddingSymbol] = useState('');
 
     useEffect(() => {
         setBiddingTokenUsdPrice(null);
@@ -151,11 +155,11 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
     const auctioningTokenSymbol = KNOWN_TOKENS.find((t) =>
         (network === 'mainnet' ? t.mainnet : t.testnet) === auctioningToken,
-    )?.symbol ?? '';
+    )?.symbol ?? customAuctioningSymbol;
 
     const biddingTokenSymbol = KNOWN_TOKENS.find((t) =>
         (network === 'mainnet' ? t.mainnet : t.testnet) === biddingToken,
-    )?.symbol ?? '';
+    )?.symbol ?? customBiddingSymbol;
 
     const auctioningDecimals = KNOWN_TOKENS.find((t) =>
         (network === 'mainnet' ? t.mainnet : t.testnet) === auctioningToken,
@@ -200,16 +204,19 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
     const { txState, resetTx, createAuction, approveToken } = opnosis;
 
-    const handleApprove = async () => {
+    const handleCreateAuction = async () => {
         if (!sellAmount || !auctioningToken) return;
-        const ok = await approveToken(auctioningToken, parseTokenAmount(sellAmount, auctioningDecimals));
-        if (ok) setStep('create');
-    };
 
-    const handleCreate = async () => {
+        // Step 1: Approve
+        setStep('approving');
+        const approved = await approveToken(auctioningToken, parseTokenAmount(sellAmount, auctioningDecimals));
+        if (!approved) { setStep('ready'); return; }
+
+        // Step 2: Create
+        setStep('creating');
         const nowSec = BigInt(Math.floor(Date.now() / 1000));
-        const cancelSec = BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n;
-        const auctionSec = BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n;
+        const cancelSec = BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n + BigInt(parseInt(cancelMinutes, 10) || 0) * 60n;
+        const auctionSec = BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n + BigInt(parseInt(auctionMinutes, 10) || 0) * 60n;
 
         let orderPlacementStartDate = 0n;
         let baseTime = nowSec;
@@ -232,6 +239,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             isAtomicClosureAllowed: atomicClose,
         });
         if (ok) onCreated?.();
+        setStep('ready');
     };
 
     const busy = txState.status === 'pending';
@@ -241,13 +249,15 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             <div style={sectionTitle}>Create Auction</div>
 
             {/* Step indicator */}
-            <div style={s.stepRow}>
-                <div style={s.stepCircle(step === 'approve')}>1</div>
-                <span style={s.stepLabel(step === 'approve')}>Approve</span>
-                <div style={s.stepLine(step === 'create')} />
-                <div style={s.stepCircle(step === 'create')}>2</div>
-                <span style={s.stepLabel(step === 'create')}>Create</span>
-            </div>
+            {step !== 'ready' && (
+                <div style={s.stepRow}>
+                    <div style={s.stepCircle(step === 'approving')}>1</div>
+                    <span style={s.stepLabel(step === 'approving')}>Approve</span>
+                    <div style={s.stepLine(step === 'creating')} />
+                    <div style={s.stepCircle(step === 'creating')}>2</div>
+                    <span style={s.stepLabel(step === 'creating')}>Create</span>
+                </div>
+            )}
 
             {!connected && <div style={s.warningBox}>Connect wallet first</div>}
 
@@ -261,6 +271,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     onChange={setAuctioningToken}
                     network={network}
                     excludeBiddingOnly
+                    onSymbolResolved={setCustomAuctioningSymbol}
                 />
                 <TokenSelect
                     label="Bidding Token"
@@ -268,16 +279,17 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     value={biddingToken}
                     onChange={setBiddingToken}
                     network={network}
+                    onSymbolResolved={setCustomBiddingSymbol}
                 />
             </div>
             <div style={s.row}>
                 <div style={s.field}>
                     <label style={labelStyle}>Total Auction Tokens{auctioningTokenSymbol ? ` (${auctioningTokenSymbol})` : ''}<HelpTip text="The total number of tokens to be distributed to winning bidders." /></label>
-                    <input style={inputStyle} value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value.replace(/\./g, ''))} placeholder="100" />
+                    <input style={inputStyle} inputMode="decimal" value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!sellAmount) setSellAmount('0'); }} placeholder="0" />
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If the total bid amount does not reach this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 for no minimum — the auction will succeed regardless of how much is raised." /></label>
-                    <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value.replace(/\./g, ''))} placeholder="0" />
+                    <input style={inputStyle} inputMode="decimal" value={minFunding} onChange={(e) => setMinFunding(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minFunding) setMinFunding('0'); }} placeholder="0" />
                     {(() => {
                         const val = parseFloat(minFunding);
                         if (!val || val <= 0 || biddingTokenUsdPrice === null) return null;
@@ -288,11 +300,11 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             <div style={s.row}>
                 <div style={s.field}>
                     <label style={labelStyle}>Reserve Price (USD) per Token<HelpTip text="The lowest USD price per token you are willing to accept. Bids below this price will not be filled. The equivalent amount in bidding tokens is calculated automatically." /></label>
-                    <input style={inputStyle} value={reservePriceUsd} onChange={(e) => onReservePriceChange(e.target.value)} placeholder="0" />
+                    <input style={inputStyle} inputMode="decimal" value={reservePriceUsd} onChange={(e) => onReservePriceChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!reservePriceUsd) setReservePriceUsd('0'); }} placeholder="0" />
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Min Receive{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ' (bidding token)'}<HelpTip text="The minimum total bidding tokens you will receive if all auction tokens are sold. Auto-calculated from Total Auction Tokens and Reserve Price, or enter directly to set the reserve price." /></label>
-                    <input style={inputStyle} value={minReceiveBidding} onChange={(e) => onMinReceiveChange(e.target.value)} placeholder="0" />
+                    <input style={inputStyle} inputMode="decimal" value={minReceiveBidding} onChange={(e) => onMinReceiveChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minReceiveBidding) setMinReceiveBidding('0'); }} placeholder="0" />
                     {biddingTokenUsdPrice === null && biddingToken && (
                         <span style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>
                             USD price unavailable — enter min receive directly.
@@ -324,26 +336,30 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Min Bid Per Order{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum amount of bidding tokens a single bid must contain. Prevents spam and dust bids. Set to 0 to allow any amount." /></label>
-                    <input style={inputStyle} value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value)} placeholder="0.1" />
+                    <input style={inputStyle} inputMode="decimal" value={minBidPerOrder} onChange={(e) => setMinBidPerOrder(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minBidPerOrder) setMinBidPerOrder('0'); }} placeholder="0" />
                 </div>
             </div>
             <div style={s.row}>
                 <div style={s.field}>
                     <label style={labelStyle}>Cancel Window (optional)<HelpTip text={startMode === 'schedule' ? 'How long after the scheduled start bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.' : 'How long from now bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.'} /></label>
                     <div style={s.dualInput}>
-                        <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value.replace(/\./g, ''))} />
+                        <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!cancelDays) setCancelDays('0'); }} />
                         <span style={s.unitLabel}>days</span>
-                        <input style={s.shortInput} type="number" min="0" max="23" value={cancelHours} onChange={(e) => setCancelHours(e.target.value.replace(/\./g, ''))} />
+                        <input style={s.shortInput} type="number" min="0" max="23" value={cancelHours} onChange={(e) => setCancelHours(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!cancelHours) setCancelHours('0'); }} />
                         <span style={s.unitLabel}>hours</span>
+                        <input style={s.shortInput} type="number" min="0" max="59" value={cancelMinutes} onChange={(e) => setCancelMinutes(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!cancelMinutes) setCancelMinutes('0'); }} />
+                        <span style={s.unitLabel}>min</span>
                     </div>
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Auction Duration<HelpTip text={startMode === 'schedule' ? 'How long the auction runs after the scheduled start. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.' : 'How long the auction runs from now. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.'} /></label>
                     <div style={s.dualInput}>
-                        <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value.replace(/\./g, ''))} />
+                        <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!auctionDays) setAuctionDays('0'); }} />
                         <span style={s.unitLabel}>days</span>
-                        <input style={s.shortInput} type="number" min="0" max="23" value={auctionHours} onChange={(e) => setAuctionHours(e.target.value.replace(/\./g, ''))} />
+                        <input style={s.shortInput} type="number" min="0" max="23" value={auctionHours} onChange={(e) => setAuctionHours(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!auctionHours) setAuctionHours('0'); }} />
                         <span style={s.unitLabel}>hours</span>
+                        <input style={s.shortInput} type="number" min="0" max="59" value={auctionMinutes} onChange={(e) => setAuctionMinutes(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!auctionMinutes) setAuctionMinutes('0'); }} />
+                        <span style={s.unitLabel}>min</span>
                     </div>
                 </div>
             </div>
@@ -353,25 +369,25 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                 <HelpTip text="When enabled, the auctioneer can settle the auction early once the min funding threshold is met. Useful for fast fundraises, but may reduce price discovery by cutting off later bids. When disabled, the auction runs for the full duration, maximizing participation and price discovery." />
             </label>
 
-            {step === 'approve' ? (
+            {(() => {
+                const sellNum = parseFloat(sellAmount);
+                const hasPrice = parseFloat(reservePriceUsd) > 0 || parseFloat(minReceiveBidding) > 0;
+                const hasMinBid = parseFloat(minBidPerOrder) > 0;
+                const hasDuration = (parseInt(auctionDays, 10) || 0) > 0 || (parseInt(auctionHours, 10) || 0) > 0 || (parseInt(auctionMinutes, 10) || 0) > 0;
+                const formReady = !!auctioningToken && !!biddingToken && sellNum > 0 && hasPrice && hasMinBid && hasDuration;
+                const disabled = busy || !connected || !formReady;
+                const label = step === 'approving' ? 'Approving...' : step === 'creating' ? 'Creating...' : 'Create Auction';
+                return (
                 <button
                     className="glow-amber"
-                    style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
-                    disabled={busy || !connected}
-                    onClick={() => void handleApprove()}
+                    style={{ ...btnPrimary, width: '100%', ...(disabled ? btnDisabled : {}) }}
+                    disabled={disabled}
+                    onClick={() => void handleCreateAuction()}
                 >
-                    {busy ? 'Approving...' : 'Approve Token'}
+                    {label}
                 </button>
-            ) : (
-                <button
-                    className="glow-amber"
-                    style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
-                    disabled={busy || !connected}
-                    onClick={() => void handleCreate()}
-                >
-                    {busy ? 'Creating...' : 'Create Auction'}
-                </button>
-            )}
+                );
+            })()}
 
             {txState.status !== 'idle' && (
                 <div style={statusMsg(txState.status === 'error')}>

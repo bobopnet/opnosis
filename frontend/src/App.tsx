@@ -380,6 +380,7 @@ export function App() {
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('full-distribution')}><span style={s.pillIcon}>&#127873;</span>Full Token Distribution</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('atomic-closure')}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('extendable')}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('auto-settlement')}><span style={s.pillIcon}>&#9203;</span>Automatic Settlement</button>
                     </div>
                 )}
 

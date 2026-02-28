@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
-import { formatTokenAmount, formatTimestamp, formatPrice, parseTokenAmount } from '@opnosis/shared';
+import { formatTokenAmount, formatTimestamp, formatPrice, parseTokenAmount, getAuctionStatus } from '@opnosis/shared';
 import {
     color, font, card, btnPrimary, btnDisabled, input as inputStyle,
     label as labelStyle, sectionTitle as sectionTitleStyle, statusMsg, dismissBtn, badge as badgeStyle,
 } from '../styles.js';
-import type { IndexedAuction, IndexedClearing } from '../types.js';
+import type { IndexedAuction, IndexedClearing, IndexedOrder } from '../types.js';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
 
 const s = {
@@ -114,6 +114,26 @@ const s = {
     } as React.CSSProperties,
 };
 
+/**
+ * Use backend status as baseline, but advance it forward using client-side time.
+ * Blockchain time can be ahead of Date.now(), so we never "downgrade" a status
+ * the backend already confirmed (e.g. never turn 'ended' back into 'open').
+ */
+const STATUS_ORDER = ['upcoming', 'open', 'cancellation_closed', 'ended', 'settled'] as const;
+function liveStatus(a: IndexedAuction): string {
+    const backendIdx = STATUS_ORDER.indexOf(a.status as typeof STATUS_ORDER[number]);
+    const clientStatus = getAuctionStatus(
+        BigInt(a.cancellationEndDate),
+        BigInt(a.auctionEndDate),
+        a.isSettled,
+        BigInt(Date.now()),
+        BigInt(a.orderPlacementStartDate || '0'),
+    );
+    const clientIdx = STATUS_ORDER.indexOf(clientStatus as typeof STATUS_ORDER[number]);
+    // Return whichever is more advanced
+    return clientIdx > backendIdx ? clientStatus : a.status;
+}
+
 function statusBadge(status: string, settling?: boolean, failed?: boolean): React.CSSProperties {
     if (failed) return badgeStyle('muted');
     if (settling) return badgeStyle('purple');
@@ -157,6 +177,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const [clearing, setClearing] = useState<IndexedClearing | null>(null);
     const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
     const [busyAction, setBusyAction] = useState<string | null>(null); // 'bid', 'settle', 'claim', 'extend'
+    const [expandedOrders, setExpandedOrders] = useState<IndexedOrder[]>([]);
+    const [ordersLoading, setOrdersLoading] = useState(false);
 
     const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress, addPendingBid } = opnosis;
     const busy = txState.status === 'pending';
@@ -171,8 +193,16 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         setExtendAuctionEnd('');
         setBiddingTokenUsdPrice(null);
         setClearing(null);
+        setExpandedOrders([]);
         resetTx();
     }, [expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /* Tick every 10s so auction statuses update in real-time */
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 10_000);
+        return () => clearInterval(timer);
+    }, []);
 
     /* Fetch auctions */
     useEffect(() => {
@@ -237,6 +267,33 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     }, [expandedId, auctions]);
 
 
+    /* Fetch orders for expanded auction */
+    useEffect(() => {
+        if (!expandedId) return;
+        const auction = auctions.find((a) => a.id === expandedId);
+        if (!auction || Number(auction.orderCount) === 0) {
+            setExpandedOrders([]);
+            return;
+        }
+        let cancelled = false;
+        async function loadOrders() {
+            setOrdersLoading(true);
+            try {
+                const res = await fetch(`${API_BASE_URL}/auctions/${expandedId}/orders`);
+                if (!res.ok) return;
+                const data = await res.json() as IndexedOrder[];
+                if (!cancelled) setExpandedOrders(data);
+            } catch {
+                // orders unavailable
+            } finally {
+                if (!cancelled) setOrdersLoading(false);
+            }
+        }
+        void loadOrders();
+        const timer = setInterval(() => void loadOrders(), 15_000);
+        return () => { cancelled = true; clearInterval(timer); };
+    }, [expandedId, auctions]);
+
     const refresh = () => setFetchKey((k) => k + 1);
 
     /* Auto-refresh every 15s to pick up settlement confirmations */
@@ -289,10 +346,11 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const handleBid = async (auction: IndexedAuction) => {
         const minBuy = bidMinReceive;
         if (!bidSellAmount || !minBuy) return;
-        setBusyAction('bid');
+        setBusyAction('bid-approving');
         try {
             const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals));
             if (!approved) return;
+            setBusyAction('bid-placing');
             const ok = await placeOrders(
                 BigInt(auction.id),
                 [parseTokenAmount(minBuy, auction.auctioningTokenDecimals)],
@@ -356,9 +414,11 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         setExpandedId((prev) => (prev === id ? null : id));
     };
 
-    const upcoming = auctions.filter((a) => a.status === 'upcoming');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    void now; // referenced to ensure re-renders when the timer ticks
+    const upcoming = auctions.filter((a) => liveStatus(a) === 'upcoming');
     const active = auctions.filter((a) =>
-        a.status === 'open' || a.status === 'cancellation_closed'
+        liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed'
         || (settledIds.has(a.id) && !a.isSettled) // keep "Settling..." visible until backend confirms
     );
 
@@ -369,7 +429,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         const _minFunding = BigInt(a.minFundingThreshold || '0');
         const _totalBid = BigInt(a.totalBidAmount || '0');
         const isFailed = a.fundingNotReached
-            || (a.status === 'ended' && !a.isSettled && _minFunding > 0n && _totalBid < _minFunding);
+            || (liveStatus(a) === 'ended' && !a.isSettled && _minFunding > 0n && _totalBid < _minFunding);
         return (
         <div style={s.detail}>
             {/* Token addresses */}
@@ -403,6 +463,39 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 <div style={{ marginBottom: '8px' }}>
                     <div style={s.metaLabel}>Cancel Window Ends</div>
                     <div style={s.metaValue}>{formatTimestamp(BigInt(a.cancellationEndDate))}</div>
+                </div>
+            )}
+
+            {/* Current Bids */}
+            {Number(a.orderCount) > 0 && (
+                <div style={s.section} onClick={(e) => e.stopPropagation()}>
+                    <div style={sectionTitleStyle}>Current Bids ({expandedOrders.filter((o) => !o.cancelled).length})</div>
+                    {ordersLoading && expandedOrders.length === 0 ? (
+                        <div style={{ color: color.textSecondary, fontFamily: font.body, fontSize: '13px' }}>Loading bids...</div>
+                    ) : (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font.body, fontSize: '13px' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: `1px solid ${color.borderStrong}` }}>
+                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>#</th>
+                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bid Amount</th>
+                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Min Receive</th>
+                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Address</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {expandedOrders.filter((o) => !o.cancelled).map((o) => (
+                                        <tr key={o.orderId} style={{ borderBottom: `1px solid ${color.borderSubtle}` }}>
+                                            <td style={{ padding: '10px 12px', color: color.textSecondary }}>{o.orderId}</td>
+                                            <td style={{ padding: '10px 12px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
+                                            <td style={{ padding: '10px 12px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                            <td style={{ padding: '10px 12px', color: color.textSecondary, fontFamily: 'monospace', fontSize: '12px' }}>{o.userAddress.slice(0, 10)}...{o.userAddress.slice(-6)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -478,7 +571,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             })()}
 
             {/* Upcoming notice */}
-            {a.status === 'upcoming' && (
+            {liveStatus(a) === 'upcoming' && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Bidding Not Yet Open</div>
                     <div style={{ color: color.textSecondary, fontFamily: font.body, fontSize: '15px' }}>
@@ -488,7 +581,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
 
             {/* Place Bid — hide when settling */}
-            {(a.status === 'open' || a.status === 'cancellation_closed') && !settledIds.has(a.id) && (
+            {(liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed') && !settledIds.has(a.id) && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Place Bid</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -515,13 +608,13 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleBid(a); }}
-                    >{busyAction === 'bid' ? 'Processing...' : 'Place Bid'}</button>
+                    >{busyAction === 'bid-approving' ? 'Approving...' : busyAction === 'bid-placing' ? 'Placing Bid...' : 'Place Bid'}</button>
                 </div>
             )}
 
             {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open (only if min funding met) */}
-            {!settledIds.has(a.id) && (a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (() => {
-                const isAtomicClosure = a.status !== 'ended';
+            {!settledIds.has(a.id) && (liveStatus(a) === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && liveStatus(a) !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (() => {
+                const isAtomicClosure = liveStatus(a) !== 'ended';
                 const totalBid = BigInt(a.totalBidAmount || '0');
                 const minFunding = BigInt(a.minFundingThreshold || '0');
                 const fundingMet = minFunding === 0n || totalBid >= minFunding;
@@ -583,12 +676,13 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const renderCard = (a: IndexedAuction) => {
         const isHovered = hoveredId === a.id;
         const isExpanded = expandedId === a.id;
-        const isUpcoming = a.status === 'upcoming';
+        const status = liveStatus(a);
+        const isUpcoming = status === 'upcoming';
         const isSettling = settledIds.has(a.id) && !a.isSettled;
         const minFunding = BigInt(a.minFundingThreshold || '0');
         const totalBid = BigInt(a.totalBidAmount || '0');
         const isFailed = a.fundingNotReached
-            || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBid < minFunding);
+            || (status === 'ended' && !a.isSettled && minFunding > 0n && totalBid < minFunding);
         return (
             <div
                 key={a.id}
@@ -608,7 +702,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             >
                 <div style={s.cardHeader}>
                     <span style={s.cardTitle}>{a.auctioningTokenName || `Auction #${a.id}`}</span>
-                    <span style={statusBadge(a.status, isSettling, isFailed)}>{statusLabel(a.status, isSettling, isFailed)}</span>
+                    <span style={statusBadge(status, isSettling, isFailed)}>{statusLabel(status, isSettling, isFailed)}</span>
                 </div>
                 <div style={s.label}>Total Auction Tokens</div>
                 <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals)} {a.auctioningTokenSymbol}</div>

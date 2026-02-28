@@ -96,7 +96,11 @@ export function ResultsList({ stats }: Props) {
                 const res = await fetch(`${API_BASE_URL}/auctions`);
                 if (!res.ok) throw new Error('Failed to fetch');
                 const auctions = await res.json() as IndexedAuction[];
-                const finished = auctions.filter((a) => a.isSettled || a.status === 'ended');
+                const finished = auctions.filter((a) => {
+                    // Use backend status OR client-side time (whichever is more advanced)
+                    const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
+                    return a.isSettled || a.status === 'ended' || clientEnded;
+                });
 
                 const results: ResultRow[] = await Promise.all(
                     finished.map(async (auction) => {
@@ -169,8 +173,10 @@ export function ResultsList({ stats }: Props) {
                         {rows.map(({ auction: a, clearing, usdPrice }) => {
                             const minFunding = BigInt(a.minFundingThreshold || '0');
                             const totalBidAmt = BigInt(a.totalBidAmount || '0');
+                            const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
+                            const currentStatus = (a.status === 'ended' || clientEnded) ? 'ended' : a.status;
                             const isFailed = a.fundingNotReached
-                                || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBidAmt < minFunding);
+                                || (currentStatus === 'ended' && !a.isSettled && minFunding > 0n && totalBidAmt < minFunding);
 
                             // Compute actual raised from clearing data (clearing price × tokens sold)
                             // totalBidAmount includes excess refunded to bidders

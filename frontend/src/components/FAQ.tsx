@@ -210,11 +210,11 @@ const sections: Section[] = [
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
                 a: <>
-                    The auction is marked as <strong>Failed</strong> and no fees are charged. All bidding tokens are fully refundable to bidders, and the auctioneer&apos;s sell tokens are returned.
+                    The auction is marked as <strong>Failed</strong> and no fees are charged. All bidding tokens are automatically refunded to bidders, and the auctioneer&apos;s sell tokens are returned.
                     <br /><br />
-                    Your bids will automatically show as <strong>&ldquo;Cancelled&rdquo;</strong> in the <strong>My Bids</strong> tab because the auction did not reach the minimum funding required for settlement to proceed. This is not a manual cancellation &mdash; it happens automatically when the auction ends without enough total bids.
+                    Your bids will show as <strong>&ldquo;Cancelled&rdquo;</strong> in the <strong>My Bids</strong> tab because the auction did not reach the minimum funding required. This is not a manual cancellation &mdash; it happens automatically when the auction ends without enough total bids.
                     <br /><br />
-                    Once the auction is settled on-chain, a <strong>Claim Refund</strong> button will appear next to each cancelled bid. Click it to reclaim your full bidding token amount. The settlement process is automatic and typically happens shortly after the auction ends.
+                    Settlement and refund distribution are fully automatic &mdash; the backend handles both transactions shortly after the auction ends. No manual action is needed from bidders or the auctioneer.
                 </>,
             },
             {
@@ -299,11 +299,11 @@ const sections: Section[] = [
                 </>,
             },
             {
-                q: 'How do I claim my tokens after settlement?',
+                q: 'Do I need to claim my tokens after settlement?',
                 a: <>
-                    Once the auction is settled, go to the <strong>My Bids</strong> tab. Each of your winning bids will show a <strong>Claim</strong> button. Click it to receive your purchased tokens. If you have multiple winning bids, you can use <strong>Claim All</strong> to claim them in one transaction.
+                    No. Token distribution is fully automatic. After an auction is settled, the backend submits a single batch transaction that delivers tokens directly to every participant&apos;s wallet &mdash; winners receive auction tokens and losing bidders receive refunds. No manual claiming is needed.
                     <br /><br />
-                    If your bid did not win, you can claim a refund of your bidding tokens from the same tab.
+                    You can track the status of your bids in the <strong>My Bids</strong> tab. See <a href="#" onClick={(e) => { e.stopPropagation(); const el = document.getElementById('auto-settlement'); if (el) { el.click(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }} style={{ color: '#c4b5fd', textDecoration: 'underline' }}>Automatic Settlement</a> for full details.
                 </>,
             },
         ],
@@ -315,6 +315,23 @@ const sections: Section[] = [
                 id: 'bitcoin-native',
                 q: 'What network does Opnosis run on?',
                 a: 'Opnosis Auction runs on OPNet, a smart-contract layer on Bitcoin Layer 1. Transactions are secured by Bitcoin\u2019s proof-of-work consensus. The platform supports both testnet and mainnet.',
+            },
+            {
+                id: 'auto-settlement',
+                q: 'How does automatic settlement and token distribution work?',
+                a: <>
+                    Once an auction ends, the Opnosis backend automatically handles everything &mdash; no action required from the auctioneer or bidders.
+                    <br /><br />
+                    <strong>Step 1 &mdash; Settlement:</strong> The backend detects when an auction has ended and submits a settlement transaction that computes the clearing price on-chain.
+                    <br /><br />
+                    <strong>Step 2 &mdash; Distribution:</strong> Immediately after settlement, the backend submits a single batch transaction that distributes tokens to every participant:
+                    <br /><br />
+                    &bull; <strong>Winners</strong> receive their purchased auction tokens directly to their wallet.<br />
+                    &bull; <strong>Losing bidders</strong> (below the clearing price) receive a full refund of their bidding tokens.<br />
+                    &bull; <strong>Failed auctions</strong> (below the funding threshold) &mdash; all bidders receive full refunds and the auctioneer&apos;s tokens are returned.
+                    <br /><br />
+                    The entire process costs only <strong>two BTC gas transactions total</strong>, regardless of the number of bidders. The smart contract loops through all orders in a single execution and transfers directly to each participant&apos;s address. There is no per-bidder gas cost and no need for bidders to manually claim tokens.
+                </>,
             },
             {
                 id: 'open-source',

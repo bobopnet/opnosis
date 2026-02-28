@@ -127,8 +127,9 @@ const clearings = new Map<number, IndexedClearing>();
 let highestKnownId = 0;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-// Auto-settle state
+// Auto-settle / auto-refund state
 const settleAttempted = new Set<number>();
+const refundAttempted = new Set<number>();
 let _txParams: TransactionParameters | null = null;
 
 // Token metadata cache
@@ -395,6 +396,35 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
                 console.warn(`Auto-settle auction ${id} failed:`, err);
             }
         }
+
+        // Auto-distribute tokens for all settled auctions.
+        // The contract sends tokens directly to each order owner — anyone can
+        // trigger claims. Winners receive auctioning tokens, losers and failed
+        // auction bidders receive bidding token refunds.
+        for (const [id, auction] of auctions) {
+            if (!auction.isSettled) continue;
+            if (refundAttempted.has(id)) continue;
+            refundAttempted.add(id);
+            try {
+                const orders = await getOrdersData(contract, cache, id);
+                if (!orders) continue;
+                const claimable = orders.filter((o) => !o.cancelled && !o.claimed);
+                if (claimable.length === 0) continue;
+                const orderIds = claimable.map((o) => BigInt(o.orderId));
+                const sim = await contract.simulateClaimFromParticipantOrder(BigInt(id), orderIds);
+                if ('error' in (sim as object)) {
+                    const errSim = sim as { error: string };
+                    console.warn(`Auto-distribute auction ${id} simulation error:`, errSim.error);
+                    continue;
+                }
+                const sendable = sim as { sendTransaction(params: TransactionParameters): Promise<unknown> };
+                await sendable.sendTransaction(_txParams);
+                console.log(`Auto-distributed tokens for ${claimable.length} orders in auction ${id}`);
+                cache.invalidate(`orders:${id}`);
+            } catch (err) {
+                console.warn(`Auto-distribute auction ${id} failed:`, err);
+            }
+        }
     }
 }
 
@@ -414,6 +444,15 @@ export function startIndexer(
     // Initial poll
     void pollOnce(contract, cache);
     pollTimer = setInterval(() => void pollOnce(contract, cache), intervalMs);
+}
+
+export async function getTokenInfo(address: string): Promise<{ name: string; symbol: string; decimals: number }> {
+    const [name, symbol, decimals] = await Promise.all([
+        resolveTokenName(address),
+        resolveTokenSymbol(address),
+        resolveTokenDecimals(address),
+    ]);
+    return { name, symbol, decimals };
 }
 
 export function getAuctions(): IndexedAuction[] {

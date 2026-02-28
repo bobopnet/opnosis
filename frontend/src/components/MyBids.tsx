@@ -83,10 +83,11 @@ export function MyBids({ connected, opnosis }: Props) {
     const [clearings, setClearings] = useState<Map<string, IndexedClearing>>(new Map());
     const [loading, setLoading] = useState(true);
     const [fetchKey, setFetchKey] = useState(0);
-    const [busyKey, setBusyKey] = useState<string | null>(null); // which order or 'all'
+    const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
+    const addBusy = useCallback((k: string) => setBusyKeys((s) => new Set(s).add(k)), []);
+    const removeBusy = useCallback((k: string) => setBusyKeys((s) => { const n = new Set(s); n.delete(k); return n; }), []);
 
-    const { txState, resetTx, cancelOrders, claimOrders, hexAddress, completedKeys, markCompleted, pendingBids, removePendingBid } = opnosis;
-    const busy = txState.status === 'pending';
+    const { txState, resetTx, cancelOrders, claimOrders, settleAuction, hexAddress, completedKeys, markCompleted, pendingBids, removePendingBid } = opnosis;
 
     const refresh = useCallback(() => setFetchKey((k) => k + 1), []);
 
@@ -115,13 +116,15 @@ export function MyBids({ connected, opnosis }: Props) {
                 const withOrders = auctions.filter((a) => Number(a.orderCount) > 0);
                 const allRows: BidRow[] = [];
 
+                const normAddr = hexAddress.replace(/^0x/i, '').toLowerCase();
                 await Promise.all(withOrders.map(async (auction) => {
                     try {
-                        const oRes = await fetch(`${API_BASE_URL}/auctions/${auction.id}/orders`);
+                        const oRes = await fetch(`${API_BASE_URL}/auctions/${auction.id}/orders?address=${encodeURIComponent(hexAddress)}`);
                         if (!oRes.ok) return;
                         const orders = await oRes.json() as IndexedOrder[];
+                        // Client-side filter as fallback (server filter may not be deployed yet)
                         const mine = orders.filter(
-                            (o) => o.userAddress.toLowerCase() === hexAddress.toLowerCase(),
+                            (o) => o.userAddress.replace(/^0x/i, '').toLowerCase() === normAddr,
                         );
                         for (const order of mine) {
                             allRows.push({ auction, order });
@@ -166,50 +169,85 @@ export function MyBids({ connected, opnosis }: Props) {
 
     const handleCancel = async (row: BidRow) => {
         const key = bidKey(row.auction.id, row.order.orderId);
-        setBusyKey(key);
+        addBusy(key);
         const ok = await cancelOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
-        setBusyKey(null);
+        removeBusy(key);
         if (ok) {
             markCompleted(key, 'cancelled');
             refresh();
         }
     };
 
+    /** Settle then wait for on-chain confirmation before returning. */
+    const settleAndWait = async (auctionId: string): Promise<boolean> => {
+        const ok = await settleAuction(BigInt(auctionId));
+        if (!ok) return false;
+        resetTx();
+        // Poll API until isSettled flips to true (settlement TX confirmed)
+        for (let i = 0; i < 40; i++) {
+            await new Promise((r) => setTimeout(r, 15_000));
+            try {
+                const res = await fetch(`${API_BASE_URL}/auctions/${auctionId}`);
+                if (res.ok) {
+                    const data = await res.json() as IndexedAuction;
+                    if (data.isSettled) return true;
+                }
+            } catch { /* keep polling */ }
+        }
+        return false;
+    };
+
     const handleClaim = async (row: BidRow) => {
         const key = bidKey(row.auction.id, row.order.orderId);
-        setBusyKey(key);
+        addBusy(key);
+        if (!row.auction.isSettled) {
+            const confirmed = await settleAndWait(row.auction.id);
+            if (!confirmed) { removeBusy(key); return; }
+        }
         const ok = await claimOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
-        setBusyKey(null);
+        removeBusy(key);
         if (ok) {
             markCompleted(key, 'claimed');
             refresh();
         }
     };
 
-    const handleClaimAll = async () => {
-        const claimable = rows.filter((r) => {
-            const key = bidKey(r.auction.id, r.order.orderId);
-            const done = completedKeys.get(key);
-            return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
-                && done !== 'claimed' && done !== 'cancelled';
-        });
-        if (claimable.length === 0) return;
-        setBusyKey('all');
-        // Group by auction ID for batch claiming
+    const isRefundable = (r: BidRow) => {
+        const key = bidKey(r.auction.id, r.order.orderId);
+        const done = completedKeys.get(key);
+        if (r.order.cancelled || r.order.claimed || done === 'claimed' || done === 'cancelled') return false;
+        const a = r.auction;
+        const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
+        const aStatus = (a.status === 'ended' || a.status === 'settled' || clientEnded) ? (a.isSettled ? 'settled' : 'ended') : a.status;
+        const minFunding = BigInt(a.minFundingThreshold || '0');
+        const totalBid = BigInt(a.totalBidAmount || '0');
+        return a.fundingNotReached || (aStatus === 'ended' && minFunding > 0n && totalBid < minFunding);
+    };
+
+    const handleClaimAllRefunds = async () => {
+        const refundable = rows.filter(isRefundable);
+        if (refundable.length === 0) return;
+        addBusy('all-refunds');
+        // Settle any unsettled auctions first, wait for on-chain confirmation
+        const unsettledIds = new Set(refundable.filter((r) => !r.auction.isSettled).map((r) => r.auction.id));
+        for (const auctionId of unsettledIds) {
+            const confirmed = await settleAndWait(auctionId);
+            if (!confirmed) { removeBusy('all-refunds'); return; }
+        }
         const byAuction = new Map<string, bigint[]>();
-        for (const r of claimable) {
+        for (const r of refundable) {
             const ids = byAuction.get(r.auction.id) ?? [];
             ids.push(BigInt(r.order.orderId));
             byAuction.set(r.auction.id, ids);
         }
         for (const [auctionId, orderIds] of byAuction) {
             const ok = await claimOrders(BigInt(auctionId), orderIds);
-            if (!ok) { setBusyKey(null); return; }
+            if (!ok) { removeBusy('all-refunds'); return; }
             for (const oid of orderIds) {
                 markCompleted(bidKey(auctionId, Number(oid)), 'claimed');
             }
         }
-        setBusyKey(null);
+        removeBusy('all-refunds');
         refresh();
     };
 
@@ -237,9 +275,10 @@ export function MyBids({ connected, opnosis }: Props) {
         const now = Date.now();
         const result: DisplayRow[] = [...rows];
 
-        // Add unmatched, non-expired pending bids as synthetic rows
+        // Add unmatched, non-expired pending bids for the current wallet only
         for (const pb of pendingBids) {
             if (now - pb.timestamp > PENDING_EXPIRY_MS) continue;
+            if (pb.address.toLowerCase() !== hexAddress.toLowerCase()) continue;
             const matched = rows.some(
                 (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
             );
@@ -294,25 +333,19 @@ export function MyBids({ connected, opnosis }: Props) {
         );
     }
 
-    const claimableCount = rows.filter((r) => {
-        const key = bidKey(r.auction.id, r.order.orderId);
-        const done = completedKeys.get(key);
-        const isClaimable = r.auction.isSettled && !r.order.cancelled && !r.order.claimed
-            && done !== 'claimed' && done !== 'cancelled';
-        return isClaimable;
-    }).length;
+    const refundableCount = rows.filter(isRefundable).length;
 
     return (
         <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div style={sectionTitleStyle}>My Bids</div>
-                {claimableCount >= 2 && (
+                {refundableCount >= 2 && (
                     <button
-                        className="glow-amber"
-                        style={{ ...btnPrimary, padding: '8px 18px', fontSize: '13px', ...(busy ? btnDisabled : {}) }}
-                        disabled={busy}
-                        onClick={() => void handleClaimAll()}
-                    >{busyKey === 'all' ? 'Processing...' : 'Claim All'}</button>
+                        className="glow-purple"
+                        style={{ ...btnSecondary, padding: '8px 18px', fontSize: '13px', ...(busyKeys.has('all-refunds') ? btnDisabled : {}) }}
+                        disabled={busyKeys.has('all-refunds')}
+                        onClick={() => void handleClaimAllRefunds()}
+                    >{busyKeys.has('all-refunds') ? 'Processing...' : 'Claim All Refunds'}</button>
                 )}
             </div>
 
@@ -351,21 +384,27 @@ export function MyBids({ connected, opnosis }: Props) {
                             const doneAction = completedKeys.get(key);
                             const isClaimed = o.claimed || doneAction === 'claimed';
                             const isCancelled = o.cancelled || doneAction === 'cancelled';
-                            const canCancel = a.hasCancelWindow && !a.isSettled && a.status === 'open' && !isCancelled && !isClaimed;
+                            // Use backend status, only advance forward with client time
+                            const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
+                            const aStatus = (a.status === 'ended' || a.status === 'settled' || clientEnded) ? (a.isSettled ? 'settled' : 'ended') : a.status;
+                            const canCancel = a.hasCancelWindow && !a.isSettled && aStatus === 'open' && !isCancelled && !isClaimed;
                             const canClaim = a.isSettled && !isCancelled && !isClaimed;
 
                             const minFunding = BigInt(a.minFundingThreshold || '0');
                             const totalBid = BigInt(a.totalBidAmount || '0');
                             const isFailed = a.fundingNotReached
-                                || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBid < minFunding);
-                            const canClaimRefund = isFailed && a.isSettled && !isClaimed && !isCancelled;
+                                || (aStatus === 'ended' && minFunding > 0n && totalBid < minFunding);
+                            // Show Claim Refund as soon as the auction has ended and failed —
+                            // don't wait for on-chain settlement (auto-settle will handle it,
+                            // or the user can settle manually).
+                            const canClaimRefund = isFailed && !isClaimed && !isCancelled;
 
                             let statusText = 'Active';
                             let statusVariant: 'amber' | 'success' | 'muted' = 'amber';
                             if (isCancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
                             else if (isFailed && isClaimed) { statusText = 'Refunded'; statusVariant = 'success'; }
-                            else if (isClaimed) { statusText = 'Claimed'; statusVariant = 'success'; }
-                            else if (isFailed) { statusText = 'Cancelled'; statusVariant = 'muted'; }
+                            else if (isClaimed) { statusText = 'Sent'; statusVariant = 'success'; }
+                            else if (isFailed) { statusText = 'Failed'; statusVariant = 'muted'; }
 
                             return (
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
@@ -390,26 +429,26 @@ export function MyBids({ connected, opnosis }: Props) {
                                         {canCancel && (
                                             <button
                                                 className="glow-purple"
-                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
-                                                disabled={busy}
+                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busyKeys.has(key) ? btnDisabled : {}) }}
+                                                disabled={busyKeys.has(key)}
                                                 onClick={() => void handleCancel(r)}
-                                            >{busyKey === key ? 'Processing...' : 'Cancel'}</button>
+                                            >{busyKeys.has(key) ? 'Processing...' : 'Cancel'}</button>
                                         )}
                                         {canClaim && !isFailed && (
                                             <button
                                                 className="glow-amber"
-                                                style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
-                                                disabled={busy}
+                                                style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busyKeys.has(key) ? btnDisabled : {}) }}
+                                                disabled={busyKeys.has(key)}
                                                 onClick={() => void handleClaim(r)}
-                                            >{busyKey === key ? 'Processing...' : 'Claim'}</button>
+                                            >{busyKeys.has(key) ? 'Processing...' : 'Claim'}</button>
                                         )}
                                         {canClaimRefund && (
                                             <button
                                                 className="glow-purple"
-                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
-                                                disabled={busy}
+                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busyKeys.has(key) ? btnDisabled : {}) }}
+                                                disabled={busyKeys.has(key)}
                                                 onClick={() => void handleClaim(r)}
-                                            >{busyKey === key ? 'Processing...' : 'Claim Refund'}</button>
+                                            >{busyKeys.has(key) ? 'Processing...' : 'Claim Refund'}</button>
                                         )}
                                     </td>
                                 </tr>

@@ -132,11 +132,16 @@ Each directory is its own sub-project with its own package.json. They share type
 - Frontend reads network from OP_WALLET connection
 - Backend reads network from environment
 
-### Build Order
+### Development
+- Frontend: `cd frontend && npx vite --host 0.0.0.0` (Vite dev server, no build needed)
+- Backend: `cd backend && npx tsx src/index.ts` (runs TypeScript directly)
+- Contracts: must be compiled before deployment (`cd contracts && npm run build`)
+
+### Production Build Order
 1. Contracts first (`cd contracts && npm install && npm run build`)
 2. Shared types (if separate build step)
 3. Backend (`cd backend && npm install && npm run build`)
-4. Frontend (`cd frontend && npm install && npm run build`)
+4. Frontend (`cd frontend && npm install && npm run build`) — only for static deployment
 
 ---
 

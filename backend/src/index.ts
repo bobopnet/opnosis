@@ -15,7 +15,7 @@ import HyperExpress from '@btc-vision/hyper-express';
 import { OpnosisContract } from '@opnosis/shared';
 import { config, provider, networkConfig, wallet, txParams } from './config.js';
 import { Cache } from './cache.js';
-import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats } from './indexer.js';
+import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats, getTokenInfo } from './indexer.js';
 import { getTokenUsdPrice } from './pricefeed.js';
 
 const contract = new OpnosisContract(
@@ -104,6 +104,22 @@ app.get('/price/:tokenAddress', async (req, res) => {
     res.json(data);
 });
 
+// -- GET /token/:address -------------------------------------------------------
+
+app.get('/token/:address', async (req, res) => {
+    const address = req.path_parameters?.['address'] ?? '';
+    if (!address) {
+        res.status(400).json({ error: 'Missing token address' });
+        return;
+    }
+    try {
+        const info = await getTokenInfo(address);
+        res.json(info);
+    } catch {
+        res.status(500).json({ error: 'Failed to resolve token info' });
+    }
+});
+
 // -- GET /auctions -------------------------------------------------------------
 
 app.get('/auctions', (_req, res) => {
@@ -142,6 +158,16 @@ app.get('/auctions/:id/orders', async (req, res) => {
     const orders = await getOrdersData(contract, cache, id);
     if (!orders) {
         res.status(500).json({ error: 'Failed to fetch orders' });
+        return;
+    }
+    // Optional address filter: ?address=0x... returns only matching orders
+    const filterAddr = req.query_parameters?.['address'] ?? '';
+    if (filterAddr) {
+        const norm = filterAddr.replace(/^0x/i, '').toLowerCase();
+        const filtered = orders.filter(
+            (o) => o.userAddress.replace(/^0x/i, '').toLowerCase() === norm,
+        );
+        res.json(filtered);
         return;
     }
     res.json(orders);

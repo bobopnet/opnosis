@@ -21,6 +21,7 @@ export interface PendingBid {
     readonly auctionId: string;
     readonly sellAmount: string;     // base units (after parseTokenAmount)
     readonly buyAmount: string;      // base units (after parseTokenAmount)
+    readonly address: string;        // hex address of the wallet that placed it
     readonly timestamp: number;      // Date.now() when placed
 }
 
@@ -65,10 +66,12 @@ export function useOpnosis(
         setCompletedKeys((prev) => new Map(prev).set(key, action));
     }, []);
 
+    const hexAddress = address?.toString() ?? '';
+
     const [pendingBids, setPendingBids] = useState<PendingBid[]>([]);
     const addPendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string) => {
-        setPendingBids((prev) => [...prev, { auctionId, sellAmount, buyAmount, timestamp: Date.now() }]);
-    }, []);
+        setPendingBids((prev) => [...prev, { auctionId, sellAmount, buyAmount, address: hexAddress, timestamp: Date.now() }]);
+    }, [hexAddress]);
     const removePendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string) => {
         setPendingBids((prev) => {
             const idx = prev.findIndex((b) => b.auctionId === auctionId && b.sellAmount === sellAmount && b.buyAmount === buyAmount);
@@ -265,8 +268,8 @@ export function useOpnosis(
 
             // Wait for approval TX to confirm on-chain before returning
             setTxState({ status: 'pending', message: 'Waiting for approval to confirm...' });
-            for (let attempt = 0; attempt < 40; attempt++) {
-                await new Promise((r) => setTimeout(r, 15_000));
+            for (let attempt = 0; attempt < 120; attempt++) {
+                await new Promise((r) => setTimeout(r, 5_000));
                 try {
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                     const chk = await token.allowance(address, spenderAddr);
@@ -287,8 +290,6 @@ export function useOpnosis(
             return false;
         }
     }, [provider, btcNetwork, address]);
-
-    const hexAddress = address?.toString() ?? '';
 
     return { txState, resetTx, hexAddress, completedKeys, markCompleted, pendingBids, addPendingBid, removePendingBid, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

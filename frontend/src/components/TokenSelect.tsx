@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KNOWN_TOKENS } from '@opnosis/shared';
 import type { KnownToken } from '@opnosis/shared';
+import { API_BASE_URL } from '../constants.js';
 import {
     color, font,
     input as inputStyle, label as labelStyle,
@@ -45,6 +46,8 @@ interface Props {
     readonly help?: string;
     /** Hide tokens marked as biddingOnly (e.g. for the auctioning token selector). */
     readonly excludeBiddingOnly?: boolean;
+    /** Called when a custom address resolves to a token symbol. */
+    readonly onSymbolResolved?: (symbol: string) => void;
 }
 
 /** Filter tokens that have an address for the current network. */
@@ -61,29 +64,68 @@ function tokenAddress(token: KnownToken, network: string): string {
     return network === 'mainnet' ? token.mainnet : token.testnet;
 }
 
-export function TokenSelect({ value, onChange, network, label, help, excludeBiddingOnly }: Props) {
+export function TokenSelect({ value, onChange, network, label, help, excludeBiddingOnly, onSymbolResolved }: Props) {
     const available = tokensForNetwork(network, excludeBiddingOnly);
 
     // Determine if current value matches a known token
     const matchedSymbol = available.find((t) => tokenAddress(t, network) === value)?.symbol ?? null;
     const isCustom = value.length > 0 && matchedSymbol === null;
     const [showCustom, setShowCustom] = useState(isCustom);
+    const [resolvedSymbol, setResolvedSymbol] = useState<string | null>(null);
+    const [resolving, setResolving] = useState(false);
+
+    // Resolve symbol when a custom address is entered (min length to avoid spam)
+    useEffect(() => {
+        if (!showCustom || value.length < 20) {
+            setResolvedSymbol(null);
+            return;
+        }
+        let cancelled = false;
+        setResolving(true);
+        async function resolve() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/token/${encodeURIComponent(value)}`);
+                if (!res.ok) return;
+                const data = await res.json() as { symbol: string; name: string };
+                if (!cancelled && data.symbol && data.symbol !== '???') {
+                    setResolvedSymbol(data.symbol);
+                    onSymbolResolved?.(data.symbol);
+                } else if (!cancelled) {
+                    setResolvedSymbol(null);
+                    onSymbolResolved?.('');
+                }
+            } catch {
+                if (!cancelled) setResolvedSymbol(null);
+            } finally {
+                if (!cancelled) setResolving(false);
+            }
+        }
+        void resolve();
+        return () => { cancelled = true; };
+    }, [showCustom, value]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const sel = e.target.value;
         if (sel === CUSTOM_VALUE) {
             setShowCustom(true);
+            setResolvedSymbol(null);
             onChange('');
+            onSymbolResolved?.('');
         } else if (sel === '') {
             setShowCustom(false);
+            setResolvedSymbol(null);
             onChange('');
+            onSymbolResolved?.('');
         } else {
             setShowCustom(false);
+            setResolvedSymbol(null);
             onChange(sel);
+            onSymbolResolved?.('');
         }
     };
 
     const selectValue = showCustom ? CUSTOM_VALUE : (matchedSymbol !== null ? value : '');
+    const customLabel = resolvedSymbol ? resolvedSymbol : 'Custom address';
 
     return (
         <div style={s.wrapper}>
@@ -102,15 +144,27 @@ export function TokenSelect({ value, onChange, network, label, help, excludeBidd
                         </option>
                     );
                 })}
-                <option value={CUSTOM_VALUE}>Custom address</option>
+                <option value={CUSTOM_VALUE}>{customLabel}</option>
             </select>
             {showCustom && (
-                <input
-                    style={s.customInput}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder="0x..."
-                />
+                <>
+                    <input
+                        style={s.customInput}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        placeholder="0x..."
+                    />
+                    {resolving && (
+                        <div style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '4px' }}>
+                            Resolving token...
+                        </div>
+                    )}
+                    {resolvedSymbol && !resolving && (
+                        <div style={{ color: color.amber, fontSize: '13px', fontFamily: font.body, marginTop: '4px' }}>
+                            Detected: {resolvedSymbol}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
