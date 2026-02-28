@@ -321,16 +321,32 @@ export async function getStats(): Promise<AuctionStats> {
     // Collect settled auctions that need price lookups
     const priceTasks: { raised: number; tokenAddress: string }[] = [];
 
-    for (const [, auction] of auctions) {
+    for (const [id, auction] of auctions) {
         totalOrdersPlaced += Number(auction.orderCount);
         if (auction.status === 'settled') {
             settledAuctions++;
-            const totalBid = BigInt(auction.totalBidAmount || '0');
-            if (totalBid > 0n) {
+            // Use clearing data to compute actual raised (clearing price × tokens sold)
+            // totalBidAmount includes excess that gets refunded to bidders
+            const clearing = clearings.get(id);
+            if (clearing) {
+                const sellAmt = BigInt(auction.auctionedSellAmount);
+                const clearBuy = BigInt(clearing.clearingBuyAmount);
+                const clearSell = BigInt(clearing.clearingSellAmount);
+                // raised = auctionedSellAmount * (clearingSellAmount / clearingBuyAmount)
+                const raisedTokens = sellAmt * clearSell / clearBuy;
                 priceTasks.push({
-                    raised: Number(totalBid) / 1e8,
+                    raised: Number(raisedTokens) / 1e8,
                     tokenAddress: auction.biddingToken,
                 });
+            } else {
+                // Fallback to totalBidAmount if clearing not available
+                const totalBid = BigInt(auction.totalBidAmount || '0');
+                if (totalBid > 0n) {
+                    priceTasks.push({
+                        raised: Number(totalBid) / 1e8,
+                        tokenAddress: auction.biddingToken,
+                    });
+                }
             }
         } else if (auction.status === 'upcoming') {
             upcomingAuctions++;

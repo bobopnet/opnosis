@@ -167,10 +167,20 @@ export function ResultsList({ stats }: Props) {
                     </thead>
                     <tbody>
                         {rows.map(({ auction: a, clearing, usdPrice }) => {
-                            const totalBid = BigInt(a.totalBidAmount || '0');
-                            const totalBidHuman = Number(totalBid) / 1e8;
-                            const usdValue = usdPrice > 0 && totalBidHuman > 0
-                                ? `$${(totalBidHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            // Compute actual raised from clearing data (clearing price × tokens sold)
+                            // totalBidAmount includes excess refunded to bidders
+                            let raisedTokens: bigint;
+                            if (clearing) {
+                                const sellAmt = BigInt(a.auctionedSellAmount);
+                                const clearBuy = BigInt(clearing.clearingBuyAmount);
+                                const clearSell = BigInt(clearing.clearingSellAmount);
+                                raisedTokens = sellAmt * clearSell / clearBuy;
+                            } else {
+                                raisedTokens = BigInt(a.totalBidAmount || '0');
+                            }
+                            const raisedHuman = Number(raisedTokens) / 1e8;
+                            const usdValue = usdPrice > 0 && raisedHuman > 0
+                                ? `$${(raisedHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                 : '--';
 
                             let clearingPrice = '--';
@@ -194,7 +204,7 @@ export function ResultsList({ stats }: Props) {
                                         {formatTokenAmount(BigInt(a.auctionedSellAmount)).split('.')[0]} {a.auctioningTokenSymbol}
                                     </td>
                                     <td style={s.td}>
-                                        {formatTokenAmount(totalBid).split('.')[0]} {a.biddingTokenSymbol}
+                                        {formatTokenAmount(raisedTokens).split('.')[0]} {a.biddingTokenSymbol}
                                     </td>
                                     <td style={s.td}>{usdValue}</td>
                                     <td style={s.td}>

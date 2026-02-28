@@ -151,6 +151,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const [extendAuctionEnd, setExtendAuctionEnd] = useState('');
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
     const [clearing, setClearing] = useState<IndexedClearing | null>(null);
+    const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
 
     const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
@@ -289,7 +290,10 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
 
     const handleSettle = async (auction: IndexedAuction) => {
         const ok = await settleAuction(BigInt(auction.id));
-        if (ok) refresh();
+        if (ok) {
+            setSettledIds((prev) => new Set(prev).add(auction.id));
+            refresh();
+        }
     };
 
     const handleClaim = async (auction: IndexedAuction) => {
@@ -354,7 +358,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
 
             {/* Extend Auction (auctioneer only, non-settled) */}
-            {!a.isSettled && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
+            {!a.isSettled && !settledIds.has(a.id) && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Extend Auction</div>
                     <div style={s.inputRow}>
@@ -456,7 +460,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
 
             {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open */}
-            {(a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (
+            {!settledIds.has(a.id) && (a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>{a.status === 'ended' ? 'Settlement' : 'Atomic Closure'}</div>
                     <button

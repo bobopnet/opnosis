@@ -77,6 +77,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [rows, setRows] = useState<BidRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchKey, setFetchKey] = useState(0);
+    const [busyKey, setBusyKey] = useState<string | null>(null); // which order or 'all'
 
     const { txState, resetTx, cancelOrders, claimOrders, hexAddress, completedKeys, markCompleted } = opnosis;
     const busy = txState.status === 'pending';
@@ -134,17 +135,23 @@ export function MyBids({ connected, opnosis }: Props) {
     const bidKey = (auctionId: string, orderId: number) => `${auctionId}-${orderId}`;
 
     const handleCancel = async (row: BidRow) => {
+        const key = bidKey(row.auction.id, row.order.orderId);
+        setBusyKey(key);
         const ok = await cancelOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
+        setBusyKey(null);
         if (ok) {
-            markCompleted(bidKey(row.auction.id, row.order.orderId));
+            markCompleted(key, 'cancelled');
             refresh();
         }
     };
 
     const handleClaim = async (row: BidRow) => {
+        const key = bidKey(row.auction.id, row.order.orderId);
+        setBusyKey(key);
         const ok = await claimOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
+        setBusyKey(null);
         if (ok) {
-            markCompleted(bidKey(row.auction.id, row.order.orderId));
+            markCompleted(key, 'claimed');
             refresh();
         }
     };
@@ -152,10 +159,12 @@ export function MyBids({ connected, opnosis }: Props) {
     const handleClaimAll = async () => {
         const claimable = rows.filter((r) => {
             const key = bidKey(r.auction.id, r.order.orderId);
+            const done = completedKeys.get(key);
             return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
-                && !completedKeys.has(key);
+                && done !== 'claimed' && done !== 'cancelled';
         });
         if (claimable.length === 0) return;
+        setBusyKey('all');
         // Group by auction ID for batch claiming
         const byAuction = new Map<string, bigint[]>();
         for (const r of claimable) {
@@ -165,11 +174,12 @@ export function MyBids({ connected, opnosis }: Props) {
         }
         for (const [auctionId, orderIds] of byAuction) {
             const ok = await claimOrders(BigInt(auctionId), orderIds);
-            if (!ok) return;
+            if (!ok) { setBusyKey(null); return; }
             for (const oid of orderIds) {
-                markCompleted(bidKey(auctionId, Number(oid)));
+                markCompleted(bidKey(auctionId, Number(oid)), 'claimed');
             }
         }
+        setBusyKey(null);
         refresh();
     };
 
@@ -204,8 +214,9 @@ export function MyBids({ connected, opnosis }: Props) {
 
     const claimableCount = rows.filter((r) => {
         const key = bidKey(r.auction.id, r.order.orderId);
+        const done = completedKeys.get(key);
         return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
-            && !completedKeys.has(key);
+            && done !== 'claimed' && done !== 'cancelled';
     }).length;
 
     return (
@@ -218,7 +229,7 @@ export function MyBids({ connected, opnosis }: Props) {
                         style={{ ...btnPrimary, padding: '8px 18px', fontSize: '13px', ...(busy ? btnDisabled : {}) }}
                         disabled={busy}
                         onClick={() => void handleClaimAll()}
-                    >{busy ? 'Processing...' : 'Claim All'}</button>
+                    >{busyKey === 'all' ? 'Processing...' : 'Claim All'}</button>
                 )}
             </div>
 
@@ -237,9 +248,9 @@ export function MyBids({ connected, opnosis }: Props) {
                         {rows.map((r) => {
                             const { auction: a, order: o } = r;
                             const key = bidKey(a.id, o.orderId);
-                            const isDone = completedKeys.has(key);
-                            const isClaimed = o.claimed || isDone;
-                            const isCancelled = o.cancelled || isDone;
+                            const doneAction = completedKeys.get(key);
+                            const isClaimed = o.claimed || doneAction === 'claimed';
+                            const isCancelled = o.cancelled || doneAction === 'cancelled';
                             const canCancel = !a.isSettled && a.status !== 'ended' && a.status === 'open' && !isCancelled && !isClaimed;
                             const canClaim = a.isSettled && !isCancelled && !isClaimed;
 
@@ -263,7 +274,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                                 style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
                                                 disabled={busy}
                                                 onClick={() => void handleCancel(r)}
-                                            >Cancel</button>
+                                            >{busyKey === key ? 'Processing...' : 'Cancel'}</button>
                                         )}
                                         {canClaim && (
                                             <button
@@ -271,7 +282,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                                 style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
                                                 disabled={busy}
                                                 onClick={() => void handleClaim(r)}
-                                            >Claim</button>
+                                            >{busyKey === key ? 'Processing...' : 'Claim'}</button>
                                         )}
                                     </td>
                                 </tr>

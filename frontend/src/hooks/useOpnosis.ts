@@ -21,8 +21,8 @@ interface UseOpnosisReturn {
     readonly txState: TxState;
     readonly resetTx: () => void;
     readonly hexAddress: string;
-    readonly completedKeys: Set<string>;
-    readonly markCompleted: (key: string) => void;
+    readonly completedKeys: Map<string, 'claimed' | 'cancelled'>;
+    readonly markCompleted: (key: string, action: 'claimed' | 'cancelled') => void;
     readonly createAuction: (params: {
         auctioningToken: string;
         biddingToken: string;
@@ -50,9 +50,9 @@ export function useOpnosis(
     walletAddress?: string,
 ): UseOpnosisReturn {
     const [txState, setTxState] = useState<TxState>(IDLE_TX);
-    const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set());
-    const markCompleted = useCallback((key: string) => {
-        setCompletedKeys((prev) => new Set(prev).add(key));
+    const [completedKeys, setCompletedKeys] = useState<Map<string, 'claimed' | 'cancelled'>>(new Map());
+    const markCompleted = useCallback((key: string, action: 'claimed' | 'cancelled') => {
+        setCompletedKeys((prev) => new Map(prev).set(key, action));
     }, []);
 
     const contract = useMemo(() => {
