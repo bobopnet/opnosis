@@ -3,7 +3,7 @@
  *
  * Usage: npx tsx scripts/create-auction.ts
  *
- * Auctions OrangeCoin (ORNGE) with MOTO as the bidding token.
+ * Auctions LINK with MOTO as the bidding token.
  */
 
 // DNS workaround: hardcode testnet.opnet.org IP when DNS is unavailable
@@ -59,7 +59,7 @@ const mnemonicObj = new Mnemonic(mnemonic, '', network, MLDSASecurityLevel.LEVEL
 const wallet = mnemonicObj.deriveOPWallet(AddressTypes.P2TR, 0);
 console.log(`Wallet  : ${wallet.p2tr}`);
 console.log(`Opnosis : ${contractAddress}`);
-console.log(`ORNGE   : ${tokenAddress}`);
+console.log(`LINK    : ${tokenAddress}`);
 
 // ── Transaction params for backend signing ───────────────────────────────────
 const txParams: TransactionParameters = {
@@ -76,39 +76,39 @@ const txParams: TransactionParameters = {
 const rawKeys = await provider.getPublicKeysInfoRaw([tokenAddress]);
 const tokenInfo = rawKeys[tokenAddress];
 if (!tokenInfo?.tweakedPubkey) {
-    console.error('Could not resolve ORNGE token public key. Token may not be deployed yet.');
+    console.error('Could not resolve LINK token public key. Token may not be deployed yet.');
     console.error('Run: npx tsx scripts/check-token.ts');
     process.exit(1);
 }
-const orngeHex = '0x' + tokenInfo.tweakedPubkey;
-console.log(`ORNGE pk: ${orngeHex}`);
+const linkHex = '0x' + tokenInfo.tweakedPubkey;
+console.log(`Token pk: ${linkHex}`);
 
-// ── Check ORNGE balance ─────────────────────────────────────────────────────
+// ── Check token balance ─────────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const orngeToken = getContract(orngeHex, OP_20_ABI, provider, network, wallet.address) as any;
+const linkToken = getContract(linkHex, OP_20_ABI, provider, network, wallet.address) as any;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-const orngeBal = await orngeToken.balanceOf(wallet.address);
+const linkBal = await linkToken.balanceOf(wallet.address);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-const orngeBalance: bigint = orngeBal?.properties?.balance ?? orngeBal?.result?.balance ?? 0n;
-console.log(`ORNGE bal: ${orngeBalance} (${Number(orngeBalance) / 1e8})`);
+const linkBalance: bigint = linkBal?.properties?.balance ?? linkBal?.result?.balance ?? 0n;
+console.log(`Token bal: ${linkBalance} (${Number(linkBalance) / 1e18})`);
 
-if (orngeBalance <= 0n) {
-    console.error('\nNo ORNGE tokens found in wallet. Was the token deployed correctly?');
+if (linkBalance <= 0n) {
+    console.error('\nNo LINK tokens found in wallet.');
     process.exit(1);
 }
 
-const auctioningToken = orngeHex;
+const auctioningToken = linkHex;
 const biddingToken = MOTO;
-// Auction 250K ORNGE (250,000 * 10^8)
-const auctionedSellAmount = 250_000_00000000n;
+const TOKEN_DECIMALS = 18;
+const auctionedSellAmount = 497_000n * 10n ** BigInt(TOKEN_DECIMALS);
 // Contract charges 0.3% fee deposit on top of auctionedSellAmount
 const feeDeposit = auctionedSellAmount * 3n / 1000n;
 const totalDeposit = auctionedSellAmount + feeDeposit;
 
-console.log(`\nAuctioning: ORNGE`);
+console.log(`\nAuctioning: LINK`);
 console.log(`Bidding   : MOTO`);
-console.log(`Amount    : ${Number(auctionedSellAmount) / 1e8} (+ ${Number(feeDeposit) / 1e8} fee deposit = ${Number(totalDeposit) / 1e8})`);
+console.log(`Amount    : ${Number(auctionedSellAmount) / (10 ** TOKEN_DECIMALS)} (+ ${Number(feeDeposit) / (10 ** TOKEN_DECIMALS)} fee deposit = ${Number(totalDeposit) / (10 ** TOKEN_DECIMALS)})`);
 
 // ── Resolve Opnosis contract address to public key for approve() ─────────────
 const opnosisKeys = await provider.getPublicKeysInfoRaw([contractAddress]);
@@ -122,10 +122,10 @@ console.log(`Opnosis pk: 0x${contractInfo.tweakedPubkey}`);
 
 // ── Check existing allowance ────────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const auctionToken = getContract(auctioningToken, OP_20_ABI, provider, network, wallet.address) as any;
+const auctionTokenContract = getContract(auctioningToken, OP_20_ABI, provider, network, wallet.address) as any;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-const existingAllowance = await auctionToken.allowance(wallet.address, contractAddr);
+const existingAllowance = await auctionTokenContract.allowance(wallet.address, contractAddr);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
 const currentAllowance: bigint = existingAllowance?.properties?.remaining ?? existingAllowance?.result?.remaining ?? 0n;
 console.log(`\nCurrent allowance: ${currentAllowance} (need ${totalDeposit})`);
@@ -136,7 +136,7 @@ if (currentAllowance < totalDeposit) {
     console.log(`Approving ${needed} more...`);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    const approveSim = await auctionToken.increaseAllowance(contractAddr, needed);
+    const approveSim = await auctionTokenContract.increaseAllowance(contractAddr, needed);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (approveSim.revert) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
@@ -155,7 +155,7 @@ if (currentAllowance < totalDeposit) {
         await new Promise((r) => setTimeout(r, 30_000));
         try {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const chk = await auctionToken.allowance(wallet.address, contractAddr);
+            const chk = await auctionTokenContract.allowance(wallet.address, contractAddr);
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             const val: bigint = chk?.properties?.remaining ?? chk?.result?.remaining ?? 0n;
             console.log(`  Attempt ${attempt}: allowance = ${val}`);
@@ -178,15 +178,21 @@ if (currentAllowance < totalDeposit) {
 // ── Create auction ───────────────────────────────────────────────────────────
 console.log('\nCreating auction...');
 
-// Timestamps in Unix milliseconds (matches Blockchain.block.medianTimestamp)
-const now = BigInt(Date.now());
-console.log(`Now     : ${now} (${new Date(Number(now)).toISOString()})`);
-const cancellationEndDate = now + 43_200_000n;  // 12 hours from now
-const auctionEndDate = now + 86_400_000n;       // 1 day from now
-const minBuyAmount = 25_000_00000000n; // 0.1 MOTO per ORNGE reserve price
-const minimumBiddingAmountPerOrder = 1_00000000n; // 1 token minimum bid
-const minFundingThreshold = 25_000_00000000n; // 25K MOTO minimum funding
-const isAtomicClosureAllowed = true;
+// Use blockchain's block time as reference (can be hours ahead of wall clock)
+const currentBlock = await provider.getBlock(await provider.getBlockNumber());
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const b = currentBlock as any;
+const blockTime = BigInt(b.time ?? b.medianTime ?? Date.now());
+console.log(`Block time : ${blockTime} (${new Date(Number(blockTime)).toISOString()})`);
+console.log(`Median time: ${b.medianTime} (${new Date(Number(b.medianTime)).toISOString()})`);
+console.log(`Wall clock : ${Date.now()} (${new Date().toISOString()})`);
+
+const cancellationEndDate = blockTime;                  // no cancel window
+const auctionEndDate = blockTime + 30n * 60_000n;       // 30 minutes from block time
+const minBuyAmount = 497_000n * 10n ** 18n;             // 1 MOTO per token reserve (497K MOTO for 497K LINK)
+const minimumBiddingAmountPerOrder = 1n * 10n ** 18n;   // 1 MOTO minimum bid
+const minFundingThreshold = 100_000n * 10n ** 18n;      // 100K MOTO minimum funding
+const isAtomicClosureAllowed = false;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const opnosis = getContract(contractAddress, OPNOSIS_ABI, provider, network, wallet.address) as any;
@@ -222,7 +228,8 @@ const auctionReceipt = await auctionSim.sendTransaction(txParams);
 
 console.log('\n=== Auction created ===');
 console.log('Receipt:', auctionReceipt);
-console.log(`\nAuctioning: ORNGE (${Number(auctionedSellAmount) / 1e8} tokens)`);
+console.log(`\nAuctioning: LINK (${Number(auctionedSellAmount) / (10 ** TOKEN_DECIMALS)} tokens)`);
 console.log(`Bidding   : MOTO`);
-console.log(`Cancel by : ${new Date(Number(cancellationEndDate)).toLocaleString()}`);
+console.log(`Cancel by : ${cancellationEndDate === blockTime ? 'N/A (no cancel window)' : new Date(Number(cancellationEndDate)).toLocaleString()}`);
 console.log(`Ends      : ${new Date(Number(auctionEndDate)).toLocaleString()}`);
+console.log(`Atomic    : ${isAtomicClosureAllowed}`);
