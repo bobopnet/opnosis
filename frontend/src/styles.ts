@@ -72,13 +72,13 @@ export const btnSecondary: React.CSSProperties = {
     padding: '12px 24px',
     borderRadius: '8px',
     border: `1px solid ${color.purple}`,
-    background: 'transparent',
-    color: color.purpleLight,
+    background: `linear-gradient(135deg, ${color.purple}, ${color.purpleDeep})`,
+    color: color.white,
     fontSize: '14px',
     fontWeight: 600,
     fontFamily: font.display,
     cursor: 'pointer',
-    transition: 'border-color 0.2s, color 0.2s',
+    transition: 'border-color 0.2s, color 0.2s, background 0.2s',
 };
 
 export const btnDisabled: React.CSSProperties = {
