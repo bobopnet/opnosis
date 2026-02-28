@@ -386,6 +386,7 @@ export function App() {
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('atomic-closure')}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('extendable')}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('auto-settlement')}><span style={s.pillIcon}>&#9203;</span>Automatic Settlement</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('no-fee-failed')}><span style={s.pillIcon}>&#10003;</span>No Fee on Failed Auctions</button>
                     </div>
                 )}
 

@@ -163,6 +163,8 @@ export function ResultsList({ stats }: Props) {
                         <tr style={{ borderBottom: `1px solid ${color.borderStrong}`, background: color.bgElevated }}>
                             <th style={s.th}>Auction</th>
                             <th style={s.th}>Total Auction Tokens</th>
+                            <th style={s.th}>Min Funding</th>
+                            <th style={s.th}>Total Bid Amount</th>
                             <th style={s.th}>Total Raised</th>
                             <th style={s.th}>Total Raised (USD)</th>
                             <th style={s.th}>Clearing Price (USD)</th>
@@ -218,6 +220,14 @@ export function ResultsList({ stats }: Props) {
                                     </td>
                                     <td style={s.td}>
                                         {formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}
+                                    </td>
+                                    <td style={s.td}>
+                                        {minFunding > 0n
+                                            ? `${formatTokenAmount(minFunding, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`
+                                            : <span style={{ color: color.textMuted }}>None</span>}
+                                    </td>
+                                    <td style={{ ...s.td, color: isFailed ? color.error : color.textPrimary }}>
+                                        {formatTokenAmount(totalBidAmt, a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}
                                     </td>
                                     <td style={s.td}>
                                         {isFailed ? '--' : `${formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`}

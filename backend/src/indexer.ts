@@ -129,7 +129,11 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 // Auto-settle / auto-refund state
 const settleAttempted = new Set<number>();
+const settleRetries = new Map<number, number>();
 const refundAttempted = new Set<number>();
+const refundRetries = new Map<number, number>();
+const MAX_SETTLE_RETRIES = 10;
+const MAX_REFUND_RETRIES = 10;
 let _txParams: TransactionParameters | null = null;
 
 // Token metadata cache
@@ -375,19 +379,27 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
         for (const [id, auction] of auctions) {
             if (auction.isSettled || auction.status !== 'ended') continue;
             if (settleAttempted.has(id)) continue;
-            settleAttempted.add(id);
+            const sRetries = settleRetries.get(id) ?? 0;
+            if (sRetries >= MAX_SETTLE_RETRIES) {
+                settleAttempted.add(id);
+                console.warn(`Auto-settle auction ${id}: giving up after ${MAX_SETTLE_RETRIES} retries`);
+                continue;
+            }
             try {
                 const sim = await contract.simulateSettle(BigInt(id));
                 if ('error' in (sim as object)) {
                     const errSim = sim as { error: string };
-                    console.warn(`Auto-settle auction ${id} simulation error:`, errSim.error);
+                    console.warn(`Auto-settle auction ${id} simulation error (attempt ${sRetries + 1}):`, errSim.error);
+                    settleRetries.set(id, sRetries + 1);
                     continue;
                 }
                 const sendable = sim as { sendTransaction(params: TransactionParameters): Promise<unknown> };
                 await sendable.sendTransaction(_txParams);
                 console.log(`Auto-settled auction ${id}`);
+                settleAttempted.add(id); // Success — mark done
             } catch (err) {
-                console.warn(`Auto-settle auction ${id} failed:`, err);
+                console.warn(`Auto-settle auction ${id} failed (attempt ${sRetries + 1}):`, err);
+                settleRetries.set(id, sRetries + 1);
             }
         }
 
@@ -398,25 +410,36 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
         for (const [id, auction] of auctions) {
             if (!auction.isSettled) continue;
             if (refundAttempted.has(id)) continue;
-            refundAttempted.add(id);
+            const retries = refundRetries.get(id) ?? 0;
+            if (retries >= MAX_REFUND_RETRIES) {
+                refundAttempted.add(id);
+                console.warn(`Auto-distribute auction ${id}: giving up after ${MAX_REFUND_RETRIES} retries`);
+                continue;
+            }
             try {
                 const orders = await getOrdersData(contract, cache, id);
-                if (!orders) continue;
+                if (!orders) { refundRetries.set(id, retries + 1); continue; }
                 const claimable = orders.filter((o) => !o.cancelled && !o.claimed);
-                if (claimable.length === 0) continue;
+                if (claimable.length === 0) {
+                    refundAttempted.add(id); // All already claimed — done
+                    continue;
+                }
                 const orderIds = claimable.map((o) => BigInt(o.orderId));
                 const sim = await contract.simulateClaimFromParticipantOrder(BigInt(id), orderIds);
                 if ('error' in (sim as object)) {
                     const errSim = sim as { error: string };
-                    console.warn(`Auto-distribute auction ${id} simulation error:`, errSim.error);
+                    console.warn(`Auto-distribute auction ${id} simulation error (attempt ${retries + 1}):`, errSim.error);
+                    refundRetries.set(id, retries + 1);
                     continue;
                 }
                 const sendable = sim as { sendTransaction(params: TransactionParameters): Promise<unknown> };
                 await sendable.sendTransaction(_txParams);
                 console.log(`Auto-distributed tokens for ${claimable.length} orders in auction ${id}`);
+                refundAttempted.add(id); // Success — mark done
                 cache.invalidate(`orders:${id}`);
             } catch (err) {
-                console.warn(`Auto-distribute auction ${id} failed:`, err);
+                console.warn(`Auto-distribute auction ${id} failed (attempt ${retries + 1}):`, err);
+                refundRetries.set(id, retries + 1);
             }
         }
     }

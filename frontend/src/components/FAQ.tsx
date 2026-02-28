@@ -204,13 +204,14 @@ const sections: Section[] = [
                 a: fieldTable,
             },
             {
+                id: 'no-fee-failed',
                 q: 'What is the protocol fee?',
-                a: 'Opnosis Auction charges a 0.3% fee on the sell amount, deducted automatically at settlement. The fee is displayed on the Create page. No fee is charged if the auction fails to meet its funding threshold.',
+                a: 'Opnosis Auction charges a 0.3% fee on the sell amount, deducted automatically at settlement. The fee is displayed on the Create page. If the auction fails to meet its funding threshold, no protocol fee is charged — the auctioneer\'s full deposit (sell tokens + fee deposit) is returned in full.',
             },
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
                 a: <>
-                    The auction is marked as <strong>Failed</strong> and no fees are charged. All bidding tokens are automatically refunded to bidders, and the auctioneer&apos;s sell tokens are returned.
+                    The auction is marked as <strong>Failed</strong> and <strong>no protocol fee is charged</strong>. The auctioneer&apos;s full deposit (sell tokens + fee deposit) is returned in full. All bidding tokens are automatically refunded to bidders.
                     <br /><br />
                     Your bids will show as <strong>&ldquo;Cancelled&rdquo;</strong> in the <strong>My Bids</strong> tab because the auction did not reach the minimum funding required. This is not a manual cancellation &mdash; it happens automatically when the auction ends without enough total bids.
                     <br /><br />

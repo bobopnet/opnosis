@@ -174,8 +174,12 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
     const [bidMaxUsd, setBidMaxUsd] = useState('');
     const [bidMinReceive, setBidMinReceive] = useState('');
     const [claimOrderIds, setClaimOrderIds] = useState('');
-    const [extendCancelEnd, setExtendCancelEnd] = useState('');
-    const [extendAuctionEnd, setExtendAuctionEnd] = useState('');
+    const [extCancelDays, setExtCancelDays] = useState('0');
+    const [extCancelHours, setExtCancelHours] = useState('0');
+    const [extCancelMinutes, setExtCancelMinutes] = useState('0');
+    const [extAuctionDays, setExtAuctionDays] = useState('0');
+    const [extAuctionHours, setExtAuctionHours] = useState('0');
+    const [extAuctionMinutes, setExtAuctionMinutes] = useState('0');
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
     const [clearing, setClearing] = useState<IndexedClearing | null>(null);
     const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
@@ -192,8 +196,12 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
         setBidMaxUsd('');
         setBidMinReceive('');
         setClaimOrderIds('');
-        setExtendCancelEnd('');
-        setExtendAuctionEnd('');
+        setExtCancelDays('0');
+        setExtCancelHours('0');
+        setExtCancelMinutes('0');
+        setExtAuctionDays('0');
+        setExtAuctionHours('0');
+        setExtAuctionMinutes('0');
         setBiddingTokenUsdPrice(null);
         setClearing(null);
         setExpandedOrders([]);
@@ -411,11 +419,15 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
     };
 
     const handleExtend = async (auction: IndexedAuction) => {
-        if (!extendCancelEnd || !extendAuctionEnd) return;
+        const cancelAddMs = (BigInt(parseInt(extCancelDays, 10) || 0) * 86400n + BigInt(parseInt(extCancelHours, 10) || 0) * 3600n + BigInt(parseInt(extCancelMinutes, 10) || 0) * 60n) * 1000n;
+        const auctionAddMs = (BigInt(parseInt(extAuctionDays, 10) || 0) * 86400n + BigInt(parseInt(extAuctionHours, 10) || 0) * 3600n + BigInt(parseInt(extAuctionMinutes, 10) || 0) * 60n) * 1000n;
+        if (auctionAddMs === 0n) return;
         setBusyAction('extend');
         try {
-            const newCancelEnd = BigInt(new Date(extendCancelEnd).getTime());
-            const newAuctionEnd = BigInt(new Date(extendAuctionEnd).getTime());
+            const currentCancelEnd = BigInt(auction.cancellationEndDate);
+            const currentAuctionEnd = BigInt(auction.auctionEndDate);
+            const newCancelEnd = cancelAddMs > 0n ? currentCancelEnd + cancelAddMs : currentCancelEnd;
+            const newAuctionEnd = currentAuctionEnd + auctionAddMs;
             const ok = await extendAuction(BigInt(auction.id), newCancelEnd, newAuctionEnd);
             if (ok) refresh();
         } finally {
@@ -518,28 +530,30 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
 
             {/* Extend Auction (auctioneer only, non-settled) */}
             {!a.isSettled && !settledIds.has(a.id) && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
-                <div style={s.section}>
+                <div style={s.section} onClick={(e) => e.stopPropagation()}>
                     <div style={sectionTitleStyle}>Extend Auction</div>
                     <div style={s.inputRow}>
                         <div>
-                            <label style={labelStyle}>New Cancel Window End</label>
-                            <input
-                                type="datetime-local"
-                                style={inputStyle}
-                                value={extendCancelEnd}
-                                onChange={(e) => setExtendCancelEnd(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                            />
+                            <label style={labelStyle}>Extend Cancel Window By</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" value={extCancelDays} onChange={(e) => setExtCancelDays(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extCancelDays) setExtCancelDays('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>days</span>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" max="23" value={extCancelHours} onChange={(e) => setExtCancelHours(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extCancelHours) setExtCancelHours('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>hours</span>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" max="59" value={extCancelMinutes} onChange={(e) => setExtCancelMinutes(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extCancelMinutes) setExtCancelMinutes('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>min</span>
+                            </div>
                         </div>
                         <div>
-                            <label style={labelStyle}>New Auction End</label>
-                            <input
-                                type="datetime-local"
-                                style={inputStyle}
-                                value={extendAuctionEnd}
-                                onChange={(e) => setExtendAuctionEnd(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                            />
+                            <label style={labelStyle}>Extend Auction End By</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" value={extAuctionDays} onChange={(e) => setExtAuctionDays(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extAuctionDays) setExtAuctionDays('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>days</span>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" max="23" value={extAuctionHours} onChange={(e) => setExtAuctionHours(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extAuctionHours) setExtAuctionHours('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>hours</span>
+                                <input style={{ ...inputStyle, width: '56px', textAlign: 'center' }} type="number" min="0" max="59" value={extAuctionMinutes} onChange={(e) => setExtAuctionMinutes(e.target.value.replace(/\./g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!extAuctionMinutes) setExtAuctionMinutes('0'); }} />
+                                <span style={{ fontFamily: font.body, fontSize: '14px', color: color.textSecondary }}>min</span>
+                            </div>
                         </div>
                     </div>
                     <button
@@ -556,7 +570,7 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Settlement Results</div>
                     <div style={{ color: color.textMuted, fontFamily: font.body, fontSize: '15px' }}>
-                        Min Funding Not Met — all bids are refundable.{a.isSettled ? ' Use "Claim Refund" in My Bids to reclaim your tokens.' : ' Once the auction is settled, you can claim your refund from the My Bids tab.'}
+                        Min Funding Not Met — all bids are refundable. No protocol fee is charged for failed auctions; the full deposit (including fee) is returned to the auctioneer.
                     </div>
                 </div>
             )}

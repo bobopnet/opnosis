@@ -135,6 +135,16 @@ export const OPNOSIS_ABI: BitcoinInterfaceAbi = [
         type: BitcoinAbiTypes.Function,
     },
     {
+        name: 'extendAuction',
+        inputs: [
+            { name: 'auctionId', type: ABIDataTypes.UINT256 },
+            { name: 'newCancellationEndDate', type: ABIDataTypes.UINT256 },
+            { name: 'newAuctionEndDate', type: ABIDataTypes.UINT256 },
+        ],
+        outputs: [{ name: 'success', type: ABIDataTypes.BOOL }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'getFeeParameters',
         constant: true,
         inputs: [],
