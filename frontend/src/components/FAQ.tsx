@@ -331,6 +331,8 @@ const sections: Section[] = [
                     &bull; <strong>Failed auctions</strong> (below the funding threshold) &mdash; all bidders receive full refunds and the auctioneer&apos;s tokens are returned.
                     <br /><br />
                     The entire process costs only <strong>two BTC gas transactions total</strong>, regardless of the number of bidders. The smart contract loops through all orders in a single execution and transfers directly to each participant&apos;s address. There is no per-bidder gas cost and no need for bidders to manually claim tokens.
+                    <br /><br />
+                    <strong>The BTC gas cost for both transactions is paid by the Opnosis protocol</strong> &mdash; neither the auctioneer nor the bidders are charged for settlement or distribution.
                 </>,
             },
             {
