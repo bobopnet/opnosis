@@ -9,6 +9,7 @@ export default defineConfig({
         nodePolyfills({
             globals: { Buffer: true, global: true, process: true },
             overrides: { crypto: 'crypto-browserify' },
+            protocolImports: true,
         }),
         react(),
     ],
@@ -17,6 +18,10 @@ export default defineConfig({
             '@opnosis/shared': resolve(__dirname, '../shared/src/index.ts'),
             global: 'global',
             undici: resolve(__dirname, 'node_modules/opnet/src/fetch/fetch-browser.js'),
+            // Resolve process shim for files outside frontend/node_modules (e.g. ../shared)
+            'vite-plugin-node-polyfills/shims/process': resolve(
+                __dirname, 'node_modules/vite-plugin-node-polyfills/shims/process',
+            ),
         },
         mainFields: ['module', 'main', 'browser'],
         dedupe: ['@noble/curves', '@noble/hashes', '@scure/base', 'buffer', 'react', 'react-dom'],
