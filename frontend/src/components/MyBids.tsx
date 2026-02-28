@@ -269,7 +269,8 @@ export function MyBids({ connected, opnosis }: Props) {
                             const doneAction = completedKeys.get(key);
                             const isClaimed = o.claimed || doneAction === 'claimed';
                             const isCancelled = o.cancelled || doneAction === 'cancelled';
-                            const canCancel = !a.isSettled && a.status !== 'ended' && a.status === 'open' && !isCancelled && !isClaimed;
+                            const hasCancelWindow = BigInt(a.cancellationEndDate) > BigInt(a.orderPlacementStartDate || '0');
+                            const canCancel = hasCancelWindow && !a.isSettled && a.status === 'open' && !isCancelled && !isClaimed;
                             const canClaim = a.isSettled && !isCancelled && !isClaimed;
 
                             let statusText = 'Active';

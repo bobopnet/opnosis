@@ -48,11 +48,11 @@ export function getAuctionStatus(
     cancellationEndDate: bigint,
     auctionEndDate: bigint,
     isSettled: boolean,
-    nowSeconds?: bigint,
+    nowMs?: bigint,
     orderPlacementStartDate?: bigint,
 ): AuctionStatus {
     if (isSettled) return 'settled';
-    const now = nowSeconds ?? BigInt(Math.floor(Date.now() / 1000));
+    const now = nowMs ?? BigInt(Date.now());
     if (now >= auctionEndDate) return 'ended';
     if (orderPlacementStartDate && orderPlacementStartDate > 0n && now < orderPlacementStartDate) return 'upcoming';
     if (now >= cancellationEndDate) return 'cancellation_closed';

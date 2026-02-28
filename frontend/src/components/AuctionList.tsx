@@ -152,6 +152,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
     const [clearing, setClearing] = useState<IndexedClearing | null>(null);
     const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
+    const [busyAction, setBusyAction] = useState<string | null>(null); // 'bid', 'settle', 'claim', 'extend'
 
     const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
@@ -278,37 +279,62 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const handleBid = async (auction: IndexedAuction) => {
         const minBuy = bidMinReceive;
         if (!bidSellAmount || !minBuy) return;
-        const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount));
-        if (!approved) return;
-        const ok = await placeOrders(
-            BigInt(auction.id),
-            [parseTokenAmount(minBuy)],
-            [parseTokenAmount(bidSellAmount)],
-        );
-        if (ok) refresh();
+        setBusyAction('bid');
+        try {
+            const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount));
+            if (!approved) return;
+            const ok = await placeOrders(
+                BigInt(auction.id),
+                [parseTokenAmount(minBuy)],
+                [parseTokenAmount(bidSellAmount)],
+            );
+            if (ok) {
+                setBidSellAmount('');
+                setBidMaxUsd('');
+                setBidMinReceive('');
+                refresh();
+            }
+        } finally {
+            setBusyAction(null);
+        }
     };
 
     const handleSettle = async (auction: IndexedAuction) => {
-        const ok = await settleAuction(BigInt(auction.id));
-        if (ok) {
-            setSettledIds((prev) => new Set(prev).add(auction.id));
-            refresh();
+        setBusyAction('settle');
+        try {
+            const ok = await settleAuction(BigInt(auction.id));
+            if (ok) {
+                setSettledIds((prev) => new Set(prev).add(auction.id));
+                refresh();
+            }
+        } finally {
+            setBusyAction(null);
         }
     };
 
     const handleClaim = async (auction: IndexedAuction) => {
         const ids = claimOrderIds.split(',').map((v) => BigInt(v.trim())).filter((n) => n > 0n);
         if (ids.length === 0) return;
-        const ok = await claimOrders(BigInt(auction.id), ids);
-        if (ok) refresh();
+        setBusyAction('claim');
+        try {
+            const ok = await claimOrders(BigInt(auction.id), ids);
+            if (ok) refresh();
+        } finally {
+            setBusyAction(null);
+        }
     };
 
     const handleExtend = async (auction: IndexedAuction) => {
         if (!extendCancelEnd || !extendAuctionEnd) return;
-        const newCancelEnd = BigInt(new Date(extendCancelEnd).getTime());
-        const newAuctionEnd = BigInt(new Date(extendAuctionEnd).getTime());
-        const ok = await extendAuction(BigInt(auction.id), newCancelEnd, newAuctionEnd);
-        if (ok) refresh();
+        setBusyAction('extend');
+        try {
+            const newCancelEnd = BigInt(new Date(extendCancelEnd).getTime());
+            const newAuctionEnd = BigInt(new Date(extendAuctionEnd).getTime());
+            const ok = await extendAuction(BigInt(auction.id), newCancelEnd, newAuctionEnd);
+            if (ok) refresh();
+        } finally {
+            setBusyAction(null);
+        }
     };
 
     const toggleExpand = (id: string) => {
@@ -388,7 +414,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleExtend(a); }}
-                    >{busy ? 'Processing...' : 'Extend'}</button>
+                    >{busyAction === 'extend' ? 'Processing...' : 'Extend'}</button>
                 </div>
             )}
 
@@ -455,7 +481,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleBid(a); }}
-                    >{busy ? 'Processing...' : 'Place Bid'}</button>
+                    >{busyAction === 'bid' ? 'Processing...' : 'Place Bid'}</button>
                 </div>
             )}
 
@@ -468,7 +494,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
-                    >{busy ? 'Settling...' : a.status === 'ended' ? 'Settle Auction' : 'Settle Now'}</button>
+                    >{busyAction === 'settle' ? 'Settling...' : a.status === 'ended' ? 'Settle Auction' : 'Settle Now'}</button>
                 </div>
             )}
 
@@ -491,7 +517,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleClaim(a); }}
-                    >{busy ? 'Claiming...' : 'Claim'}</button>
+                    >{busyAction === 'claim' ? 'Claiming...' : 'Claim'}</button>
                 </div>
             )}
 
