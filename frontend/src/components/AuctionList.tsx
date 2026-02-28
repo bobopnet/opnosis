@@ -349,8 +349,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             </div>
 
-            {/* Cancel window */}
-            {BigInt(a.cancellationEndDate) > 0n && (
+            {/* Cancel window — only show if cancellation ends after order placement starts (i.e. a real window exists) */}
+            {BigInt(a.cancellationEndDate) > 0n && BigInt(a.cancellationEndDate) > BigInt(a.orderPlacementStartDate || '0') && BigInt(a.cancellationEndDate) > BigInt(Date.now()) && (
                 <div style={{ marginBottom: '8px' }}>
                     <div style={s.metaLabel}>Cancel Window Ends</div>
                     <div style={s.metaValue}>{formatTimestamp(BigInt(a.cancellationEndDate))}</div>
