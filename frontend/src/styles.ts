@@ -21,8 +21,8 @@ export const color = {
     purpleDeep: '#3d1a4a',
 
     textPrimary: '#f0ece4',
-    textSecondary: '#c0bbb0',
-    textMuted: '#8a8478',
+    textSecondary: '#f0ede8',
+    textMuted: '#c0bbb0',
 
     success: '#10b981',
     error: '#ef4444',

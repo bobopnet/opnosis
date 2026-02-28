@@ -24,16 +24,34 @@ const s = {
         background: `radial-gradient(ellipse at 50% 0%, rgba(107, 45, 123, 0.08) 0%, transparent 60%), ${color.bgDeep}`,
         position: 'relative' as const,
     } as React.CSSProperties,
-    pageBg: {
+    nebulaBg: {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        objectFit: 'cover',
+        opacity: 0.7,
+        pointerEvents: 'none',
+        zIndex: 0,
+        maskImage: 'radial-gradient(ellipse 40% 55% at 50% 45%, transparent 50%, black 100%)',
+        WebkitMaskImage: 'radial-gradient(ellipse 40% 55% at 50% 45%, transparent 50%, black 100%)',
+    } as React.CSSProperties,
+    pageBgWrap: {
         position: 'fixed',
         top: 0,
         left: '50%',
         transform: 'translateX(-50%)',
         height: '115vh',
         width: 'auto',
-        opacity: 0.35,
         pointerEvents: 'none',
-        zIndex: 0,
+        zIndex: 1,
+    } as React.CSSProperties,
+    pageBg: {
+        height: '100%',
+        width: 'auto',
+        opacity: 0.45,
+        display: 'block',
     } as React.CSSProperties,
 
     /* Header */
@@ -244,12 +262,12 @@ const s = {
     footerLink: {
         fontFamily: font.body,
         fontSize: '13px',
-        color: color.textSecondary,
+        color: '#ffffff',
         textDecoration: 'none',
         transition: 'color 0.2s',
     } as React.CSSProperties,
     footerSep: {
-        color: color.textMuted,
+        color: '#ffffff',
         fontSize: '12px',
     } as React.CSSProperties,
 };
@@ -309,7 +327,10 @@ export function App() {
 
     return (
         <div style={s.page}>
-            <img src="/opnosis-avatar.svg" alt="" style={s.pageBg} />
+            <img src="/bg-nebula.jpg" alt="" style={s.nebulaBg} />
+            <div style={s.pageBgWrap}>
+                <img src="/opnosis-avatar.svg" alt="" style={s.pageBg} />
+            </div>
             {/* ── Header ──────────────────────────────────────── */}
             <header style={s.header} role="banner">
                 <div style={s.logoArea}>
@@ -419,14 +440,20 @@ export function App() {
             </main>
 
             {/* ── Footer ──────────────────────────────────────── */}
-            <footer style={s.footer}>
-                <a href="https://github.com/bobopnet/opnosis" target="_blank" rel="noopener noreferrer" style={s.footerLink} title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg></a>
-                <span style={s.footerSep}>|</span>
-                <a href="https://t.me/+_oC6gbqZGyo0YzU1" target="_blank" rel="noopener noreferrer" style={s.footerLink} title="Telegram"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg></a>
-                <span style={s.footerSep}>|</span>
-                <a href="/TERMS_OF_SERVICE.md" target="_blank" rel="noopener noreferrer" style={s.footerLink}>Terms of Service</a>
-                <span style={s.footerSep}>|</span>
-                <a href="/PRIVACY_POLICY.md" target="_blank" rel="noopener noreferrer" style={s.footerLink}>Privacy Policy</a>
+            <footer style={{borderTop: '1px solid #3d3450', padding: '24px 32px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '24px', flexWrap: 'wrap' as const, background: 'transparent', position: 'relative', zIndex: 2}}>
+                <a href="https://github.com/bobopnet/opnosis" target="_blank" rel="noopener noreferrer" style={{fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '13px', color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffffff"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <span style={{color: '#ffffff', fontSize: '12px'}}>|</span>
+                <a href="https://t.me/+_oC6gbqZGyo0YzU1" target="_blank" rel="noopener noreferrer" style={{fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '13px', color: '#ffffff', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#ffffff"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                    Telegram
+                </a>
+                <span style={{color: '#ffffff', fontSize: '12px'}}>|</span>
+                <a href="/TERMS_OF_SERVICE.md" target="_blank" rel="noopener noreferrer" style={{fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '13px', color: '#ffffff', textDecoration: 'none'}}>Terms of Service</a>
+                <span style={{color: '#ffffff', fontSize: '12px'}}>|</span>
+                <a href="/PRIVACY_POLICY.md" target="_blank" rel="noopener noreferrer" style={{fontFamily: "'IBM Plex Sans', sans-serif", fontSize: '13px', color: '#ffffff', textDecoration: 'none'}}>Privacy Policy</a>
             </footer>
         </div>
     );
