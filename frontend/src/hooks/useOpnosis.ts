@@ -243,11 +243,23 @@ export function useOpnosis(
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             const spenderAddr = Address.fromString('0x' + spenderMldsa, '0x' + contractInfo.tweakedPubkey);
 
-            setTxState({ status: 'pending', message: 'Simulating approval...' });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const token = getContract(tokenAddress, OP_20_ABI, provider, btcNetwork, address) as any;
+
+            // Check existing allowance — skip approval if already sufficient
+            setTxState({ status: 'pending', message: 'Checking allowance...' });
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const sim = await token.increaseAllowance(spenderAddr, amount);
+            const existing = await token.allowance(address, spenderAddr);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            const currentAllowance: bigint = existing?.properties?.remaining ?? existing?.result?.remaining ?? 0n;
+            if (currentAllowance >= amount) {
+                return true; // already approved — skip straight to bid
+            }
+
+            setTxState({ status: 'pending', message: 'Simulating approval...' });
+            const needed = amount - currentAllowance;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            const sim = await token.increaseAllowance(spenderAddr, needed);
             setTxState({ status: 'pending', message: 'Confirm approval in OP_WALLET...' });
             await sendSimulation(sim);
 
@@ -261,7 +273,6 @@ export function useOpnosis(
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                     const val: bigint = chk?.properties?.remaining ?? chk?.result?.remaining ?? 0n;
                     if (val >= amount) {
-                        setTxState({ status: 'success', message: 'Token approved!' });
                         return true;
                     }
                 } catch {
