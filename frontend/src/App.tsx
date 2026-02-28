@@ -277,7 +277,7 @@ export function App() {
     const opnosis = useOpnosis(provider, network, address, walletAddress ?? undefined);
     const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
-    const [pendingAuction, setPendingAuction] = useState<Partial<IndexedAuction> | null>(null);
+    const [pendingAuctions, setPendingAuctions] = useState<Partial<IndexedAuction>[]>([]);
     const [faqQuestion, setFaqQuestion] = useState<string | undefined>();
     const auctionsRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<AuctionStats | null>(null);
@@ -299,7 +299,7 @@ export function App() {
     }, [refreshKey]);
 
     const onCreated = (auctionData?: Partial<IndexedAuction>) => {
-        if (auctionData) setPendingAuction(auctionData);
+        if (auctionData) setPendingAuctions((prev) => [...prev, auctionData]);
         setRefreshKey((k) => k + 1);
         setTab('browse');
     };
@@ -403,7 +403,7 @@ export function App() {
 
                 {/* Tab content */}
                 <div ref={auctionsRef} style={s.content}>
-                    {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} pendingAuction={pendingAuction} onPendingConfirmed={() => setPendingAuction(null)} />}
+                    {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} pendingAuctions={pendingAuctions} onPendingConfirmed={(pa) => setPendingAuctions((prev) => prev.filter((p) => p !== pa))} />}
                     {tab === 'mybids' && <MyBids connected={connected} opnosis={opnosis} />}
                     {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (

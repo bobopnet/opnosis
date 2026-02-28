@@ -126,7 +126,7 @@ const fieldTable = (
             <tr><td style={s.tdField}>Auctioning Token</td><td style={s.td}>The OP-20 token you are selling.</td></tr>
             <tr><td style={s.tdField}>Bidding Token</td><td style={s.td}>The OP-20 token bidders use to place bids.</td></tr>
             <tr><td style={s.tdField}>Sell Amount</td><td style={s.td}>Total tokens you are putting up for auction.</td></tr>
-            <tr><td style={s.tdField}>Min Buy Amount</td><td style={s.td}>Minimum total bids you will accept. Sets the reserve price.</td></tr>
+            <tr><td style={s.tdField}>Min Buy Amount</td><td style={s.td}>Minimum total bids you will accept. Sets the reserve price. This value is private — bidders cannot see it. Bids below the reserve are rejected with a generic error that does not reveal the reserve price.</td></tr>
             <tr><td style={s.tdField}>Min Bid Per Order</td><td style={s.td}>Smallest individual bid allowed. Prevents dust bids.</td></tr>
             <tr><td style={s.tdField}>Min Funding Threshold</td><td style={s.td}>Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. 0 = disabled.</td></tr>
             <tr><td style={s.tdField}>Cancel Window</td><td style={s.td}>Minutes during which bidders can cancel. After this, bids are final.</td></tr>

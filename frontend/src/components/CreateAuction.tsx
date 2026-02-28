@@ -262,6 +262,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             auctionedSellAmount: parseTokenAmount(sellAmount, auctioningDecimals).toString(),
             auctioningTokenDecimals: auctioningDecimals,
             biddingTokenDecimals: biddingDecimals,
+            orderPlacementStartDate: orderPlacementStartDate.toString(),
             auctionEndDate: (baseTime + auctionMs).toString(),
             minFundingThreshold: parseTokenAmount(minFunding, biddingDecimals).toString(),
         } as Partial<IndexedAuction>);

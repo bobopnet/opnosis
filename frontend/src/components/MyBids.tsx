@@ -66,7 +66,7 @@ interface BidRow {
     order: IndexedOrder;
 }
 
-type DisplayRow = BidRow & { isPending?: boolean };
+type DisplayRow = BidRow & { isPending?: boolean; isPhantom?: boolean };
 
 const PENDING_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -272,6 +272,8 @@ export function MyBids({ connected, opnosis }: Props) {
     useEffect(() => {
         const now = Date.now();
         for (const pb of pendingBids) {
+            // Phantom bids persist until auction settles — never expire or match
+            if (pb.phantom) continue;
             if (now - pb.timestamp > PENDING_EXPIRY_MS) {
                 removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
                 continue;
@@ -293,17 +295,46 @@ export function MyBids({ connected, opnosis }: Props) {
 
         // Add unmatched, non-expired pending bids for the current wallet only
         for (const pb of pendingBids) {
-            if (now - pb.timestamp > PENDING_EXPIRY_MS) continue;
+            if (!pb.phantom && now - pb.timestamp > PENDING_EXPIRY_MS) continue;
             if (pb.address.toLowerCase() !== hexAddress.toLowerCase()) continue;
-            const matched = rows.some(
-                (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
-            );
-            if (matched) continue;
+            // Real pending bids: skip if matched on-chain
+            if (!pb.phantom) {
+                const matched = rows.some(
+                    (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
+                );
+                if (matched) continue;
+            }
 
             const auction = auctions.find((a) => a.id === pb.auctionId);
-            if (!auction) continue;
+            // Build auction metadata from fetched data or pending bid snapshot
+            const auctionData: IndexedAuction = auction ?? {
+                id: pb.auctionId,
+                auctioningToken: '',
+                auctioningTokenName: pb.auctionSnapshot?.auctioningTokenSymbol || 'Unknown',
+                auctioningTokenSymbol: pb.auctionSnapshot?.auctioningTokenSymbol || '???',
+                biddingToken: '',
+                biddingTokenName: pb.auctionSnapshot?.biddingTokenSymbol || 'Unknown',
+                biddingTokenSymbol: pb.auctionSnapshot?.biddingTokenSymbol || '???',
+                orderPlacementStartDate: '0',
+                auctionEndDate: '0',
+                cancellationEndDate: '0',
+                auctionedSellAmount: '0',
+                minBuyAmount: '0',
+                minimumBiddingAmountPerOrder: '0',
+                minFundingThreshold: '0',
+                isAtomicClosureAllowed: false,
+                orderCount: '0',
+                totalBidAmount: '0',
+                isSettled: false,
+                status: 'open',
+                auctioningTokenDecimals: pb.auctionSnapshot?.auctioningTokenDecimals ?? 18,
+                biddingTokenDecimals: pb.auctionSnapshot?.biddingTokenDecimals ?? 18,
+                auctioneerAddress: '',
+                hasCancelWindow: false,
+                fundingNotReached: false,
+            };
             result.unshift({
-                auction,
+                auction: auctionData,
                 order: {
                     orderId: -1,
                     buyAmount: pb.buyAmount,
@@ -313,7 +344,8 @@ export function MyBids({ connected, opnosis }: Props) {
                     cancelled: false,
                     claimed: false,
                 },
-                isPending: true,
+                isPending: !pb.phantom,
+                isPhantom: pb.phantom,
             });
         }
 
@@ -381,7 +413,8 @@ export function MyBids({ connected, opnosis }: Props) {
                         {displayRows.map((r, idx) => {
                             const { auction: a, order: o } = r;
 
-                            if (r.isPending) {
+                            if (r.isPending || r.isPhantom) {
+                                const phantomSettled = r.isPhantom && a.isSettled;
                                 return (
                                     <tr key={`pending-${idx}`} style={s.row}>
                                         <td style={s.td}>
@@ -390,7 +423,11 @@ export function MyBids({ connected, opnosis }: Props) {
                                         <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
                                         <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
                                         <td style={s.td}>--</td>
-                                        <td style={s.td}><span style={badgeStyle('pending')}>Pending</span></td>
+                                        <td style={s.td}>
+                                            <span style={badgeStyle(phantomSettled ? 'muted' : r.isPhantom ? 'amber' : 'pending')}>
+                                                {phantomSettled ? 'Below Reserve' : r.isPhantom ? 'Active' : 'Pending'}
+                                            </span>
+                                        </td>
                                         <td style={s.td}></td>
                                     </tr>
                                 );

@@ -158,11 +158,11 @@ interface Props {
     readonly connected: boolean;
     readonly opnosis: ReturnType<typeof useOpnosis>;
     readonly refreshKey?: number;
-    readonly pendingAuction?: Partial<IndexedAuction> | null;
-    readonly onPendingConfirmed?: () => void;
+    readonly pendingAuctions?: Partial<IndexedAuction>[];
+    readonly onPendingConfirmed?: (pa: Partial<IndexedAuction>) => void;
 }
 
-export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, onPendingConfirmed }: Props) {
+export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, onPendingConfirmed }: Props) {
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [loading, setLoading] = useState(true);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -234,15 +234,17 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
         return () => { cancelled = true; };
     }, [refreshKey, fetchKey]);
 
-    /* Clear pending auction once the real one appears from backend */
+    /* Clear pending auctions once the real ones appear from backend */
     useEffect(() => {
-        if (!pendingAuction || auctions.length === 0) return;
-        const match = auctions.some((a) =>
-            a.auctioningToken === pendingAuction.auctioningToken
-            && a.auctionedSellAmount === pendingAuction.auctionedSellAmount,
-        );
-        if (match) onPendingConfirmed?.();
-    }, [auctions, pendingAuction, onPendingConfirmed]);
+        if (!pendingAuctions?.length || auctions.length === 0) return;
+        for (const pa of pendingAuctions) {
+            const match = auctions.some((a) =>
+                a.auctioningToken === pa.auctioningToken
+                && a.auctionedSellAmount === pa.auctionedSellAmount,
+            );
+            if (match) onPendingConfirmed?.(pa);
+        }
+    }, [auctions, pendingAuctions, onPendingConfirmed]);
 
     /* Fetch bidding token USD price when expanded */
     useEffect(() => {
@@ -367,21 +369,38 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
     const handleBid = async (auction: IndexedAuction) => {
         const minBuy = bidMinReceive;
         if (!bidSellAmount || !minBuy) return;
+
+        // Client-side validation before wallet interaction
+        const sellAmt = parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals);
+        const minBidPerOrder = BigInt(auction.minimumBiddingAmountPerOrder || '0');
+        if (minBidPerOrder > 0n && sellAmt < minBidPerOrder) {
+            resetTx();
+            return;
+        }
+
         setBusyAction('bid-approving');
         try {
             const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals));
             if (!approved) return;
             setBusyAction('bid-placing');
-            const ok = await placeOrders(
+            const result = await placeOrders(
                 BigInt(auction.id),
                 [parseTokenAmount(minBuy, auction.auctioningTokenDecimals)],
                 [parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals)],
             );
-            if (ok) {
+            if (result) {
+                const snapshot = {
+                    auctioningTokenSymbol: auction.auctioningTokenSymbol,
+                    biddingTokenSymbol: auction.biddingTokenSymbol,
+                    auctioningTokenDecimals: auction.auctioningTokenDecimals,
+                    biddingTokenDecimals: auction.biddingTokenDecimals,
+                };
                 addPendingBid(
                     auction.id,
                     parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals).toString(),
                     parseTokenAmount(minBuy, auction.auctioningTokenDecimals).toString(),
+                    snapshot,
+                    result === 'phantom',
                 );
                 setBidSellAmount('');
                 setBidMaxUsd('');
@@ -429,7 +448,21 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
             const newCancelEnd = cancelAddMs > 0n ? currentCancelEnd + cancelAddMs : currentCancelEnd;
             const newAuctionEnd = currentAuctionEnd + auctionAddMs;
             const ok = await extendAuction(BigInt(auction.id), newCancelEnd, newAuctionEnd);
-            if (ok) refresh();
+            if (ok) {
+                // Optimistically update local state so UI reflects new dates immediately
+                setAuctions((prev) => prev.map((a) =>
+                    a.id === auction.id
+                        ? { ...a, cancellationEndDate: newCancelEnd.toString(), auctionEndDate: newAuctionEnd.toString() }
+                        : a,
+                ));
+                setExtCancelDays('0');
+                setExtCancelHours('0');
+                setExtCancelMinutes('0');
+                setExtAuctionDays('0');
+                setExtAuctionHours('0');
+                setExtAuctionMinutes('0');
+                refresh();
+            }
         } finally {
             setBusyAction(null);
         }
@@ -447,12 +480,12 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
         || (settledIds.has(a.id) && !a.isSettled) // keep "Settling..." visible until backend confirms
     );
 
-    if (loading && !pendingAuction) return <div style={s.loading}>Loading auctions...</div>;
-    const hasPending = pendingAuction && !auctions.some((a) =>
-        a.auctioningToken === pendingAuction.auctioningToken
-        && a.auctionedSellAmount === pendingAuction.auctionedSellAmount,
-    );
-    if (!hasPending && upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
+    if (loading && !pendingAuctions?.length) return <div style={s.loading}>Loading auctions...</div>;
+    const pendingVisible = (pendingAuctions ?? []).filter((pa) => !auctions.some((a) =>
+        a.auctioningToken === pa.auctioningToken
+        && a.auctionedSellAmount === pa.auctionedSellAmount,
+    ));
+    if (pendingVisible.length === 0 && upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
 
     const renderExpandedDetail = (a: IndexedAuction) => {
         const _minFunding = BigInt(a.minFundingThreshold || '0');
@@ -612,7 +645,13 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
             )}
 
             {/* Place Bid — hide when settling */}
-            {(liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed') && !settledIds.has(a.id) && (
+            {(liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed') && !settledIds.has(a.id) && (() => {
+                // Real-time validation
+                const sellParsed = bidSellAmount ? parseTokenAmount(bidSellAmount, a.biddingTokenDecimals) : 0n;
+                const minBidPerOrder = BigInt(a.minimumBiddingAmountPerOrder || '0');
+                const belowMinBid = minBidPerOrder > 0n && sellParsed > 0n && sellParsed < minBidPerOrder;
+                const hasValidationError = belowMinBid;
+                return (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Place Bid</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -629,6 +668,11 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
                             <input style={inputStyle} value={bidMinReceive} onChange={(e) => onMinReceiveChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                     </div>
+                    {belowMinBid && (
+                        <div style={{ color: color.error, fontSize: '12px', fontFamily: font.body, marginBottom: '12px' }}>
+                            Minimum bid per order is {formatTokenAmount(minBidPerOrder, a.biddingTokenDecimals)} {a.biddingTokenSymbol}.
+                        </div>
+                    )}
                     {biddingTokenUsdPrice === null && (
                         <div style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginBottom: '12px' }}>
                             USD price unavailable for {a.biddingTokenSymbol} — min receive cannot be computed.
@@ -636,12 +680,13 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
                     )}
                     <button
                         className="glow-amber"
-                        style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
-                        disabled={busy || !connected}
+                        style={{ ...btnPrimary, ...((busy || !connected || hasValidationError) ? btnDisabled : {}) }}
+                        disabled={busy || !connected || hasValidationError}
                         onClick={(e) => { e.stopPropagation(); void handleBid(a); }}
                     >{busyAction === 'bid-approving' ? 'Approving...' : busyAction === 'bid-placing' ? 'Placing Bid...' : 'Place Bid'}</button>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open (only if min funding met) */}
             {!settledIds.has(a.id) && (liveStatus(a) === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && liveStatus(a) !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (() => {
@@ -761,21 +806,38 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, on
     return (
         <>
             <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Open Auctions</div>
-            {hasPending && (
+            {pendingVisible.length > 0 && (
                 <div style={{ ...s.grid, marginBottom: '32px' }}>
-                    <div style={{ ...s.card, opacity: 0.7 }}>
-                        <div style={s.cardHeader}>
-                            <span style={s.cardTitle}>{pendingAuction.auctioningTokenName || pendingAuction.auctioningTokenSymbol || 'New Auction'}</span>
-                            <span style={badgeStyle('pending')}>Pending</span>
-                        </div>
-                        <div style={s.label}>Total Auction Tokens</div>
-                        <div style={s.value}>{pendingAuction.auctionedSellAmount && pendingAuction.auctioningTokenDecimals != null
-                            ? `${formatTokenAmount(BigInt(pendingAuction.auctionedSellAmount), pendingAuction.auctioningTokenDecimals)} ${pendingAuction.auctioningTokenSymbol || ''}`
-                            : '--'}</div>
-                        <div style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '12px' }}>
-                            Waiting for on-chain confirmation...
-                        </div>
-                    </div>
+                    {pendingVisible.map((pa, i) => {
+                        const hasScheduledStart = pa.orderPlacementStartDate && BigInt(pa.orderPlacementStartDate) > 0n;
+                        return (
+                            <div key={`pending-${i}`} style={{ ...s.card, opacity: 0.7 }}>
+                                <div style={s.cardHeader}>
+                                    <span style={s.cardTitle}>{pa.auctioningTokenName || pa.auctioningTokenSymbol || 'New Auction'}</span>
+                                    <span style={badgeStyle('pending')}>Pending</span>
+                                </div>
+                                <div style={s.label}>Total Auction Tokens</div>
+                                <div style={s.value}>{pa.auctionedSellAmount && pa.auctioningTokenDecimals != null
+                                    ? `${formatTokenAmount(BigInt(pa.auctionedSellAmount), pa.auctioningTokenDecimals)} ${pa.auctioningTokenSymbol || ''}`
+                                    : '--'}</div>
+                                <div style={s.label}>Min Funding Threshold</div>
+                                <div style={s.value}>{pa.minFundingThreshold && pa.biddingTokenDecimals != null
+                                    ? `${formatTokenAmount(BigInt(pa.minFundingThreshold), pa.biddingTokenDecimals)} ${pa.biddingTokenSymbol || ''}`
+                                    : '--'}</div>
+                                <div style={s.label}>Auction Ending</div>
+                                <div style={s.value}>{pa.auctionEndDate ? formatTimestamp(BigInt(pa.auctionEndDate)) : '--'}</div>
+                                {hasScheduledStart && (
+                                    <>
+                                        <div style={s.label}>Bidding Starts</div>
+                                        <div style={s.value}>{formatTimestamp(BigInt(pa.orderPlacementStartDate!))}</div>
+                                    </>
+                                )}
+                                <div style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '12px' }}>
+                                    Waiting for on-chain confirmation...
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
             {upcoming.length > 0 && (
