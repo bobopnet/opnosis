@@ -19,7 +19,7 @@ export const KNOWN_TOKENS: readonly KnownToken[] = [
     {
         symbol: 'MOTO',
         name: 'Moto',
-        decimals: 8,
+        decimals: 18,
         testnet: '0xfd4473840751d58d9f8b73bdd57d6c5260453d5518bd7cd02d0a4cf3df9bf4dd',
         mainnet: '',
         biddingOnly: true,
@@ -27,7 +27,7 @@ export const KNOWN_TOKENS: readonly KnownToken[] = [
     {
         symbol: 'PILL',
         name: 'Pill',
-        decimals: 8,
+        decimals: 18,
         testnet: '0xb09fc29c112af8293539477e23d8df1d3126639642767d707277131352040cbb',
         mainnet: '',
         biddingOnly: true,

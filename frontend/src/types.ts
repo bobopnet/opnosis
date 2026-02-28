@@ -59,5 +59,7 @@ export interface IndexedAuction {
     readonly totalBidAmount: string;
     readonly isSettled: boolean;
     readonly status: AuctionStatus;
+    readonly auctioningTokenDecimals: number;
+    readonly biddingTokenDecimals: number;
     readonly auctioneerAddress: string;
 }

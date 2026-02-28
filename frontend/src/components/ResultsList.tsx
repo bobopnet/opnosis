@@ -178,7 +178,7 @@ export function ResultsList({ stats }: Props) {
                             } else {
                                 raisedTokens = BigInt(a.totalBidAmount || '0');
                             }
-                            const raisedHuman = Number(raisedTokens) / 1e8;
+                            const raisedHuman = Number(raisedTokens) / (10 ** a.biddingTokenDecimals);
                             const usdValue = usdPrice > 0 && raisedHuman > 0
                                 ? `$${(raisedHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                 : '--';
@@ -201,10 +201,10 @@ export function ResultsList({ stats }: Props) {
                                         <div style={s.auctionName}>{a.auctioningTokenName || `Auction #${a.id}`}</div>
                                     </td>
                                     <td style={s.td}>
-                                        {formatTokenAmount(BigInt(a.auctionedSellAmount)).split('.')[0]} {a.auctioningTokenSymbol}
+                                        {formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}
                                     </td>
                                     <td style={s.td}>
-                                        {formatTokenAmount(raisedTokens).split('.')[0]} {a.biddingTokenSymbol}
+                                        {formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}
                                     </td>
                                     <td style={s.td}>{usdValue}</td>
                                     <td style={s.td}>

@@ -154,7 +154,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     const [settledIds, setSettledIds] = useState<Set<string>>(new Set());
     const [busyAction, setBusyAction] = useState<string | null>(null); // 'bid', 'settle', 'claim', 'extend'
 
-    const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress } = opnosis;
+    const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress, addPendingBid } = opnosis;
     const busy = txState.status === 'pending';
 
     /* Reset form state when expanded card changes */
@@ -281,14 +281,19 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         if (!bidSellAmount || !minBuy) return;
         setBusyAction('bid');
         try {
-            const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount));
+            const approved = await approveToken(auction.biddingToken, parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals));
             if (!approved) return;
             const ok = await placeOrders(
                 BigInt(auction.id),
-                [parseTokenAmount(minBuy)],
-                [parseTokenAmount(bidSellAmount)],
+                [parseTokenAmount(minBuy, auction.auctioningTokenDecimals)],
+                [parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals)],
             );
             if (ok) {
+                addPendingBid(
+                    auction.id,
+                    parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals).toString(),
+                    parseTokenAmount(minBuy, auction.auctioningTokenDecimals).toString(),
+                );
                 setBidSellAmount('');
                 setBidMaxUsd('');
                 setBidMinReceive('');
@@ -436,7 +441,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                             </div>
                             <div>
                                 <div style={s.metaLabel}>Total Distributed</div>
-                                <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingBuyAmount)).split('.')[0]} {a.auctioningTokenSymbol}</div>
+                                <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingBuyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</div>
                             </div>
                         </div>
                     </div>
@@ -559,9 +564,9 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                     <span style={statusBadge(a.status)}>{statusLabel(a.status)}</span>
                 </div>
                 <div style={s.label}>Total Auction Tokens</div>
-                <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount))} {a.auctioningTokenSymbol}</div>
+                <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals)} {a.auctioningTokenSymbol}</div>
                 <div style={s.label}>Min Funding Threshold</div>
-                <div style={s.value}>{formatTokenAmount(BigInt(a.minFundingThreshold))} {a.biddingTokenSymbol}</div>
+                <div style={s.value}>{formatTokenAmount(BigInt(a.minFundingThreshold), a.biddingTokenDecimals)} {a.biddingTokenSymbol}</div>
                 <div style={s.label}>Auction Ending</div>
                 <div style={s.value}>{formatTimestamp(BigInt(a.auctionEndDate))}</div>
                 {isUpcoming ? (
@@ -572,7 +577,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 ) : (
                     <>
                         <div style={s.label}>Total Bid Amount</div>
-                        <div style={s.value}>{formatTokenAmount(BigInt(a.totalBidAmount || '0'))} {a.biddingTokenSymbol}</div>
+                        <div style={s.value}>{formatTokenAmount(BigInt(a.totalBidAmount || '0'), a.biddingTokenDecimals)} {a.biddingTokenSymbol}</div>
                     </>
                 )}
 

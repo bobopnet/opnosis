@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
-import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR, KNOWN_TOKENS } from '@opnosis/shared';
+import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR, KNOWN_TOKENS, TOKEN_DECIMALS } from '@opnosis/shared';
 import { API_BASE_URL } from '../constants.js';
 import {
     color, font, card, btnPrimary, btnDisabled,
@@ -157,6 +157,14 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         (network === 'mainnet' ? t.mainnet : t.testnet) === biddingToken,
     )?.symbol ?? '';
 
+    const auctioningDecimals = KNOWN_TOKENS.find((t) =>
+        (network === 'mainnet' ? t.mainnet : t.testnet) === auctioningToken,
+    )?.decimals ?? TOKEN_DECIMALS;
+
+    const biddingDecimals = KNOWN_TOKENS.find((t) =>
+        (network === 'mainnet' ? t.mainnet : t.testnet) === biddingToken,
+    )?.decimals ?? TOKEN_DECIMALS;
+
     const canCompute = biddingTokenUsdPrice !== null && biddingTokenUsdPrice > 0;
 
     const onReservePriceChange = (val: string) => {
@@ -194,7 +202,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
     const handleApprove = async () => {
         if (!sellAmount || !auctioningToken) return;
-        const ok = await approveToken(auctioningToken, parseTokenAmount(sellAmount));
+        const ok = await approveToken(auctioningToken, parseTokenAmount(sellAmount, auctioningDecimals));
         if (ok) setStep('create');
     };
 
@@ -217,10 +225,10 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             orderPlacementStartDate,
             cancellationEndDate: baseTime + cancelSec,
             auctionEndDate: baseTime + auctionSec,
-            auctionedSellAmount: parseTokenAmount(sellAmount),
-            minBuyAmount: parseTokenAmount(minReceiveBidding || '0'),
-            minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0'),
-            minFundingThreshold: parseTokenAmount(minFunding),
+            auctionedSellAmount: parseTokenAmount(sellAmount, auctioningDecimals),
+            minBuyAmount: parseTokenAmount(minReceiveBidding || '0', biddingDecimals),
+            minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0', biddingDecimals),
+            minFundingThreshold: parseTokenAmount(minFunding, biddingDecimals),
             isAtomicClosureAllowed: atomicClose,
         });
         if (ok) onCreated?.();

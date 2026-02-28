@@ -30,6 +30,8 @@ export interface IndexedAuction {
     readonly totalBidAmount: string;
     readonly isSettled: boolean;
     readonly status: AuctionStatus;
+    readonly auctioningTokenDecimals: number;
+    readonly biddingTokenDecimals: number;
     readonly auctioneerAddress: string;
 }
 
@@ -66,6 +68,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 // Token metadata cache
 const tokenNames = new Map<string, string>();
 const tokenSymbols = new Map<string, string>();
+const tokenDecimals = new Map<string, number>();
 let _provider: AbstractRpcProvider | null = null;
 let _network: Network | null = null;
 
@@ -102,6 +105,24 @@ async function resolveTokenSymbol(address: string): Promise<string> {
     } catch {
         tokenSymbols.set(address, '???');
         return '???';
+    }
+}
+
+async function resolveTokenDecimals(address: string): Promise<number> {
+    if (tokenDecimals.has(address)) return tokenDecimals.get(address)!;
+    if (!_provider || !_network) return 18;
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const token = getContract(address, OP_20_ABI, _provider, _network) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const result = await token.decimals();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const dec = Number(result?.properties?.decimals ?? 18);
+        tokenDecimals.set(address, dec);
+        return dec;
+    } catch {
+        tokenDecimals.set(address, 18);
+        return 18;
     }
 }
 
@@ -151,11 +172,13 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
 
         const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, undefined, orderPlacementStartDate);
 
-        const [auctioningTokenName, auctioningTokenSymbol, biddingTokenName, biddingTokenSymbol] = await Promise.all([
+        const [auctioningTokenName, auctioningTokenSymbol, biddingTokenName, biddingTokenSymbol, auctioningTokenDecimals, biddingTokenDecimals] = await Promise.all([
             resolveTokenName(auctioningToken),
             resolveTokenSymbol(auctioningToken),
             resolveTokenName(biddingToken),
             resolveTokenSymbol(biddingToken),
+            resolveTokenDecimals(auctioningToken),
+            resolveTokenDecimals(biddingToken),
         ]);
 
         return {
@@ -184,6 +207,8 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
             totalBidAmount: '0',
             isSettled,
             status,
+            auctioningTokenDecimals,
+            biddingTokenDecimals,
             auctioneerAddress,
         };
     } catch {
@@ -335,7 +360,7 @@ export async function getStats(): Promise<AuctionStats> {
                 // raised = auctionedSellAmount * (clearingSellAmount / clearingBuyAmount)
                 const raisedTokens = sellAmt * clearSell / clearBuy;
                 priceTasks.push({
-                    raised: Number(raisedTokens) / 1e8,
+                    raised: Number(raisedTokens) / (10 ** auction.biddingTokenDecimals),
                     tokenAddress: auction.biddingToken,
                 });
             } else {
@@ -343,7 +368,7 @@ export async function getStats(): Promise<AuctionStats> {
                 const totalBid = BigInt(auction.totalBidAmount || '0');
                 if (totalBid > 0n) {
                     priceTasks.push({
-                        raised: Number(totalBid) / 1e8,
+                        raised: Number(totalBid) / (10 ** auction.biddingTokenDecimals),
                         tokenAddress: auction.biddingToken,
                     });
                 }

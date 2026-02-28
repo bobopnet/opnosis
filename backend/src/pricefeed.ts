@@ -8,7 +8,7 @@
  * the price feed is disabled and all prices return 0.
  */
 
-import { getContract, NativeSwapAbi, MOTOSWAP_ROUTER_ABI } from 'opnet';
+import { getContract, NativeSwapAbi, MOTOSWAP_ROUTER_ABI, OP_20_ABI } from 'opnet';
 import { Address } from '@btc-vision/transaction';
 import { config, provider } from './config.js';
 import { getNetworkConfig } from '@opnosis/shared';
@@ -129,8 +129,30 @@ async function getMotoBtc(): Promise<number | null> {
 
 const TOKEN_MOTO_CACHE_TTL_MS = 30_000; // 30s cache
 
+// ─── Per-token decimals cache ─────────────────────────────────────────────────
+
+const decCache = new Map<string, number>();
+
+async function resolveDecimals(address: string): Promise<number> {
+    if (decCache.has(address)) return decCache.get(address)!;
+    try {
+        const networkConfig = getNetworkConfig(config.network);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const token = getContract(address, OP_20_ABI, provider, networkConfig.btcNetwork) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const result = await token.decimals();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const dec = Number(result?.properties?.decimals ?? 18);
+        decCache.set(address, dec);
+        return dec;
+    } catch {
+        decCache.set(address, 18);
+        return 18;
+    }
+}
+
 interface TokenMotoEntry {
-    rate: number; // MOTO received per 1e8 of token (as float, already divided by 1e8)
+    rate: number; // human MOTO received per 1 human token
     fetchedAt: number;
 }
 
@@ -143,16 +165,19 @@ async function fetchTokenMoto(tokenAddress: string): Promise<number | null> {
     if (!routerContract || !config.motoAddress) return null;
     const cached = tokenMotoCache.get(tokenAddress);
     try {
+        const dec = await resolveDecimals(tokenAddress);
+        const oneToken = 10n ** BigInt(dec); // 1 full token in base units
         const result = await routerContract.getAmountsOut(
-            100_000_000n, // 1 token (1e8 base units)
+            oneToken,
             [Address.fromString(tokenAddress), Address.fromString(config.motoAddress)],
         );
         const amountsOut = result.properties.amountsOut;
         if (!amountsOut || amountsOut.length < 2 || amountsOut[1] === 0n) {
             return cached?.rate ?? null;
         }
-        // rate = MOTO received per 1 token (in base units), as a float ratio
-        const rate = Number(amountsOut[1]) / 1e8;
+        // rate = human MOTO received per 1 human input token
+        // MOTO is always 18 decimals
+        const rate = Number(amountsOut[1]) / 1e18;
         tokenMotoCache.set(tokenAddress, { rate, fetchedAt: Date.now() });
         return rate;
     } catch {

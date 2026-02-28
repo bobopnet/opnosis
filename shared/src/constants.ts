@@ -32,9 +32,9 @@ export const FEE_DENOMINATOR = 1_000n;
 export const FEE_NUMERATOR = 3n;
 
 /** Default token decimals for OPNet OP20 tokens. */
-export const TOKEN_DECIMALS = 8;
+export const TOKEN_DECIMALS = 18;
 
-/** Base unit multiplier (10^8). */
+/** Base unit multiplier (10^18). */
 export const BASE_UNIT = 10n ** BigInt(TOKEN_DECIMALS);
 
 /** Block explorer base URL (mainnet). */
