@@ -9,7 +9,7 @@ import { CreateAuction } from './components/CreateAuction.js';
 import { FAQ } from './components/FAQ.js';
 import { API_BASE_URL } from './constants.js';
 import { color, font, btnPrimary, btnSecondary } from './styles.js';
-import type { AuctionStats } from './types.js';
+import type { AuctionStats, IndexedAuction } from './types.js';
 
 type Tab = 'main' | 'browse' | 'mybids' | 'results' | 'create' | 'faq';
 
@@ -277,6 +277,7 @@ export function App() {
     const opnosis = useOpnosis(provider, network, address, walletAddress ?? undefined);
     const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
+    const [pendingAuction, setPendingAuction] = useState<Partial<IndexedAuction> | null>(null);
     const [faqQuestion, setFaqQuestion] = useState<string | undefined>();
     const auctionsRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<AuctionStats | null>(null);
@@ -297,7 +298,11 @@ export function App() {
         return () => { cancelled = true; };
     }, [refreshKey]);
 
-    const onCreated = () => setRefreshKey((k) => k + 1);
+    const onCreated = (auctionData?: Partial<IndexedAuction>) => {
+        if (auctionData) setPendingAuction(auctionData);
+        setRefreshKey((k) => k + 1);
+        setTab('browse');
+    };
     const goToFaq = (id: string) => { setFaqQuestion(id); setTab('faq'); };
 
     const showHero = tab === 'main';
@@ -397,7 +402,7 @@ export function App() {
 
                 {/* Tab content */}
                 <div ref={auctionsRef} style={s.content}>
-                    {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} />}
+                    {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} pendingAuction={pendingAuction} onPendingConfirmed={() => setPendingAuction(null)} />}
                     {tab === 'mybids' && <MyBids connected={connected} opnosis={opnosis} />}
                     {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (

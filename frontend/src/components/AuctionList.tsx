@@ -7,6 +7,7 @@ import {
 } from '../styles.js';
 import type { IndexedAuction, IndexedClearing, IndexedOrder } from '../types.js';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
+import { HelpTip } from './HelpTip.js';
 
 const s = {
     grid: {
@@ -157,9 +158,11 @@ interface Props {
     readonly connected: boolean;
     readonly opnosis: ReturnType<typeof useOpnosis>;
     readonly refreshKey?: number;
+    readonly pendingAuction?: Partial<IndexedAuction> | null;
+    readonly onPendingConfirmed?: () => void;
 }
 
-export function AuctionList({ connected, opnosis, refreshKey }: Props) {
+export function AuctionList({ connected, opnosis, refreshKey, pendingAuction, onPendingConfirmed }: Props) {
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [loading, setLoading] = useState(true);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -222,6 +225,16 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         void load();
         return () => { cancelled = true; };
     }, [refreshKey, fetchKey]);
+
+    /* Clear pending auction once the real one appears from backend */
+    useEffect(() => {
+        if (!pendingAuction || auctions.length === 0) return;
+        const match = auctions.some((a) =>
+            a.auctioningToken === pendingAuction.auctioningToken
+            && a.auctionedSellAmount === pendingAuction.auctionedSellAmount,
+        );
+        if (match) onPendingConfirmed?.();
+    }, [auctions, pendingAuction, onPendingConfirmed]);
 
     /* Fetch bidding token USD price when expanded */
     useEffect(() => {
@@ -422,8 +435,12 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         || (settledIds.has(a.id) && !a.isSettled) // keep "Settling..." visible until backend confirms
     );
 
-    if (loading) return <div style={s.loading}>Loading auctions...</div>;
-    if (upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
+    if (loading && !pendingAuction) return <div style={s.loading}>Loading auctions...</div>;
+    const hasPending = pendingAuction && !auctions.some((a) =>
+        a.auctioningToken === pendingAuction.auctioningToken
+        && a.auctionedSellAmount === pendingAuction.auctionedSellAmount,
+    );
+    if (!hasPending && upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
 
     const renderExpandedDetail = (a: IndexedAuction) => {
         const _minFunding = BigInt(a.minFundingThreshold || '0');
@@ -466,8 +483,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             )}
 
-            {/* Current Bids */}
-            {Number(a.orderCount) > 0 && (
+            {/* Current Bids — auctioneer only */}
+            {Number(a.orderCount) > 0 && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
                 <div style={s.section} onClick={(e) => e.stopPropagation()}>
                     <div style={sectionTitleStyle}>Current Bids ({expandedOrders.filter((o) => !o.cancelled).length})</div>
                     {ordersLoading && expandedOrders.length === 0 ? (
@@ -586,15 +603,15 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                     <div style={sectionTitleStyle}>Place Bid</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                         <div>
-                            <label style={labelStyle}>Bid Amount ({a.biddingTokenSymbol})</label>
+                            <label style={labelStyle}>Bid Amount ({a.biddingTokenSymbol})<HelpTip text={`The amount of ${a.biddingTokenSymbol || 'bidding tokens'} you want to spend. This is locked in until the auction settles or you cancel during the cancel window.`} /></label>
                             <input style={inputStyle} value={bidSellAmount} onChange={(e) => onBidAmountChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Max USD per {a.auctioningTokenSymbol}</label>
+                            <label style={labelStyle}>Max USD per {a.auctioningTokenSymbol}<HelpTip text={`The maximum price in USD you are willing to pay per ${a.auctioningTokenSymbol || 'token'}. This auto-calculates Min Receive based on the current ${a.biddingTokenSymbol || 'bidding token'} price. You only need to fill in one of Max USD or Min Receive.`} /></label>
                             <input style={inputStyle} value={bidMaxUsd} onChange={(e) => onMaxUsdChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Min Receive ({a.auctioningTokenSymbol})</label>
+                            <label style={labelStyle}>Min Receive ({a.auctioningTokenSymbol})<HelpTip text={`The minimum number of ${a.auctioningTokenSymbol || 'auction tokens'} you want to receive for your bid. If the clearing price is above your max, your bid won't win and you'll be refunded automatically.`} /></label>
                             <input style={inputStyle} value={bidMinReceive} onChange={(e) => onMinReceiveChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                     </div>
@@ -730,6 +747,23 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     return (
         <>
             <div style={{ ...sectionTitleStyle, marginBottom: '16px' }}>Open Auctions</div>
+            {hasPending && (
+                <div style={{ ...s.grid, marginBottom: '32px' }}>
+                    <div style={{ ...s.card, opacity: 0.7 }}>
+                        <div style={s.cardHeader}>
+                            <span style={s.cardTitle}>{pendingAuction.auctioningTokenName || pendingAuction.auctioningTokenSymbol || 'New Auction'}</span>
+                            <span style={badgeStyle('pending')}>Pending</span>
+                        </div>
+                        <div style={s.label}>Total Auction Tokens</div>
+                        <div style={s.value}>{pendingAuction.auctionedSellAmount && pendingAuction.auctioningTokenDecimals != null
+                            ? `${formatTokenAmount(BigInt(pendingAuction.auctionedSellAmount), pendingAuction.auctioningTokenDecimals)} ${pendingAuction.auctioningTokenSymbol || ''}`
+                            : '--'}</div>
+                        <div style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '12px' }}>
+                            Waiting for on-chain confirmation...
+                        </div>
+                    </div>
+                </div>
+            )}
             {upcoming.length > 0 && (
                 <>
                     <div style={{ ...sectionTitleStyle, marginBottom: '16px', fontSize: '16px' }}>Upcoming</div>

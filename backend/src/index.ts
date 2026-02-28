@@ -9,13 +9,14 @@
  *   GET  /auctions/:id          -> IndexedAuction
  *   GET  /auctions/:id/clearing -> IndexedClearing
  *   GET  /fee-parameters        -> { feeNumerator }
+ *   GET  /blocktime             -> { blockTimeMs }
  */
 
 import HyperExpress from '@btc-vision/hyper-express';
 import { OpnosisContract } from '@opnosis/shared';
 import { config, provider, networkConfig, wallet, txParams } from './config.js';
 import { Cache } from './cache.js';
-import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats, getTokenInfo } from './indexer.js';
+import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats, getTokenInfo, getBlockTime } from './indexer.js';
 import { getTokenUsdPrice } from './pricefeed.js';
 
 const contract = new OpnosisContract(
@@ -68,6 +69,13 @@ app.get('/health', (_req, res) => {
         network: config.network,
         contract: config.contractAddress,
     });
+});
+
+// -- GET /blocktime ------------------------------------------------------------
+
+app.get('/blocktime', async (_req, res) => {
+    const blockTimeMs = await getBlockTime();
+    res.json({ blockTimeMs });
 });
 
 // -- GET /stats ----------------------------------------------------------------

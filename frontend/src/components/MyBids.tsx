@@ -86,6 +86,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
     const addBusy = useCallback((k: string) => setBusyKeys((s) => new Set(s).add(k)), []);
     const removeBusy = useCallback((k: string) => setBusyKeys((s) => { const n = new Set(s); n.delete(k); return n; }), []);
+    const [backendDown, setBackendDown] = useState(false);
 
     const { txState, resetTx, cancelOrders, claimOrders, settleAuction, hexAddress, completedKeys, markCompleted, pendingBids, removePendingBid } = opnosis;
 
@@ -97,6 +98,21 @@ export function MyBids({ connected, opnosis }: Props) {
         const timer = setInterval(() => setFetchKey((k) => k + 1), 30_000);
         return () => clearInterval(timer);
     }, [connected]);
+
+    /* Check backend health every 30s — show manual claim buttons only when backend is down */
+    useEffect(() => {
+        async function check() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/health`, { signal: AbortSignal.timeout(5_000) });
+                setBackendDown(!res.ok);
+            } catch {
+                setBackendDown(true);
+            }
+        }
+        void check();
+        const timer = setInterval(() => void check(), 30_000);
+        return () => clearInterval(timer);
+    }, []);
 
     /* Fetch all auctions, then orders for each, filter by wallet */
     useEffect(() => {
@@ -339,7 +355,7 @@ export function MyBids({ connected, opnosis }: Props) {
         <>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                 <div style={sectionTitleStyle}>My Bids</div>
-                {refundableCount >= 2 && (
+                {backendDown && refundableCount >= 2 && (
                     <button
                         className="glow-purple"
                         style={{ ...btnSecondary, padding: '8px 18px', fontSize: '13px', ...(busyKeys.has('all-refunds') ? btnDisabled : {}) }}
@@ -400,11 +416,13 @@ export function MyBids({ connected, opnosis }: Props) {
                             const canClaimRefund = isFailed && !isClaimed && !isCancelled;
 
                             let statusText = 'Active';
-                            let statusVariant: 'amber' | 'success' | 'muted' = 'amber';
+                            let statusVariant: 'amber' | 'success' | 'muted' | 'pending' = 'amber';
                             if (isCancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
                             else if (isFailed && isClaimed) { statusText = 'Refunded'; statusVariant = 'success'; }
                             else if (isClaimed) { statusText = 'Sent'; statusVariant = 'success'; }
+                            else if (isFailed && !backendDown) { statusText = 'Refunding...'; statusVariant = 'pending'; }
                             else if (isFailed) { statusText = 'Failed'; statusVariant = 'muted'; }
+                            else if (canClaim && !backendDown) { statusText = 'Distributing...'; statusVariant = 'pending'; }
 
                             return (
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
@@ -434,7 +452,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                                 onClick={() => void handleCancel(r)}
                                             >{busyKeys.has(key) ? 'Processing...' : 'Cancel'}</button>
                                         )}
-                                        {canClaim && !isFailed && (
+                                        {backendDown && canClaim && !isFailed && (
                                             <button
                                                 className="glow-amber"
                                                 style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busyKeys.has(key) ? btnDisabled : {}) }}
@@ -442,7 +460,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                                 onClick={() => void handleClaim(r)}
                                             >{busyKeys.has(key) ? 'Processing...' : 'Claim'}</button>
                                         )}
-                                        {canClaimRefund && (
+                                        {backendDown && canClaimRefund && (
                                             <button
                                                 className="glow-purple"
                                                 style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busyKeys.has(key) ? btnDisabled : {}) }}
@@ -457,6 +475,13 @@ export function MyBids({ connected, opnosis }: Props) {
                     </tbody>
                 </table>
             </div>
+
+            {/* Backend down notice */}
+            {backendDown && (
+                <div style={{ ...statusMsg(true), marginTop: '12px' }}>
+                    Automatic distribution is temporarily unavailable. You can manually claim your tokens using the buttons above.
+                </div>
+            )}
 
             {/* Tx status */}
             {txState.status !== 'idle' && (

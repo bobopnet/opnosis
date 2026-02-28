@@ -19,8 +19,8 @@ export type SimResult = any;
 
 interface OpnosisMethods {
     readonly initiateAuction: (
-        auctioningToken: string,
-        biddingToken: string,
+        auctioningToken: Address | string,
+        biddingToken: Address | string,
         orderPlacementStartDate: bigint,
         cancellationEndDate: bigint,
         auctionEndDate: bigint,
@@ -104,6 +104,22 @@ export class OpnosisContract {
         return instance;
     }
 
+    // ── Helpers ─────────────────────────────────────────────────────────────────
+
+    /** Resolve a bech32 contract address to an Address object via provider. */
+    async resolveAddress(bech32: string): Promise<Address> {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const keys = await this.#provider.getPublicKeysInfoRaw([bech32]) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const info = keys[bech32];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (!info?.tweakedPubkey) throw new Error(`Could not resolve address: ${bech32}`);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const mldsa: string = info.mldsaHashedPublicKey || info.tweakedPubkey;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        return Address.fromString('0x' + mldsa, '0x' + info.tweakedPubkey);
+    }
+
     // ── Write simulations (return raw SimResult for sendTransaction) ──────────
 
     public async simulateInitiateAuction(
@@ -118,9 +134,13 @@ export class OpnosisContract {
         minFundingThreshold: bigint,
         isAtomicClosureAllowed: boolean,
     ): Promise<SimResult> {
+        const [auctioningAddr, biddingAddr] = await Promise.all([
+            this.resolveAddress(auctioningToken),
+            this.resolveAddress(biddingToken),
+        ]);
         return this.#contract.initiateAuction(
-            auctioningToken,
-            biddingToken,
+            auctioningAddr as unknown as string,
+            biddingAddr as unknown as string,
             orderPlacementStartDate,
             cancellationEndDate,
             auctionEndDate,

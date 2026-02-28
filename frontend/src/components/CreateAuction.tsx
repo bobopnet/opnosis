@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
+import type { IndexedAuction } from '../types.js';
 import { parseTokenAmount, FEE_NUMERATOR, FEE_DENOMINATOR, KNOWN_TOKENS, TOKEN_DECIMALS } from '@opnosis/shared';
 import { API_BASE_URL } from '../constants.js';
 import {
@@ -108,7 +109,7 @@ interface Props {
     readonly connected: boolean;
     readonly network: string;
     readonly opnosis: ReturnType<typeof useOpnosis>;
-    readonly onCreated?: () => void;
+    readonly onCreated?: (auctionData?: Partial<IndexedAuction>) => void;
 }
 
 const feePercent = `${Number(FEE_NUMERATOR * 100n) / Number(FEE_DENOMINATOR)}%`;
@@ -207,21 +208,33 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const handleCreateAuction = async () => {
         if (!sellAmount || !auctioningToken) return;
 
-        // Step 1: Approve
+        // Step 1: Approve (sellAmount + 0.3% fee deposit)
         setStep('approving');
-        const approved = await approveToken(auctioningToken, parseTokenAmount(sellAmount, auctioningDecimals));
+        const sellBase = parseTokenAmount(sellAmount, auctioningDecimals);
+        const feeDeposit = sellBase * FEE_NUMERATOR / FEE_DENOMINATOR;
+        const approved = await approveToken(auctioningToken, sellBase + feeDeposit);
         if (!approved) { setStep('ready'); return; }
 
         // Step 2: Create
+        // OPNet uses millisecond timestamps (Blockchain.block.medianTimestamp is ms).
+        // Blockchain time can be hours ahead of wall clock — fetch it from the backend.
         setStep('creating');
-        const nowSec = BigInt(Math.floor(Date.now() / 1000));
-        const cancelSec = BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n + BigInt(parseInt(cancelMinutes, 10) || 0) * 60n;
-        const auctionSec = BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n + BigInt(parseInt(auctionMinutes, 10) || 0) * 60n;
+        let nowMs = BigInt(Date.now());
+        try {
+            const btRes = await fetch(`${API_BASE_URL}/blocktime`);
+            if (btRes.ok) {
+                const btData = await btRes.json() as { blockTimeMs: string };
+                const bt = BigInt(btData.blockTimeMs);
+                if (bt > nowMs) nowMs = bt;
+            }
+        } catch { /* fall back to Date.now() */ }
+        const cancelMs = (BigInt(parseInt(cancelDays, 10) || 0) * 86400n + BigInt(parseInt(cancelHours, 10) || 0) * 3600n + BigInt(parseInt(cancelMinutes, 10) || 0) * 60n) * 1000n;
+        const auctionMs = (BigInt(parseInt(auctionDays, 10) || 0) * 86400n + BigInt(parseInt(auctionHours, 10) || 0) * 3600n + BigInt(parseInt(auctionMinutes, 10) || 0) * 60n) * 1000n;
 
         let orderPlacementStartDate = 0n;
-        let baseTime = nowSec;
+        let baseTime = nowMs;
         if (startMode === 'schedule' && scheduledStart) {
-            const startTs = BigInt(Math.floor(new Date(scheduledStart).getTime() / 1000));
+            const startTs = BigInt(new Date(scheduledStart).getTime());
             orderPlacementStartDate = startTs;
             baseTime = startTs;
         }
@@ -230,15 +243,28 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             auctioningToken,
             biddingToken,
             orderPlacementStartDate,
-            cancellationEndDate: baseTime + cancelSec,
-            auctionEndDate: baseTime + auctionSec,
+            cancellationEndDate: baseTime + cancelMs,
+            auctionEndDate: baseTime + auctionMs,
             auctionedSellAmount: parseTokenAmount(sellAmount, auctioningDecimals),
             minBuyAmount: parseTokenAmount(minReceiveBidding || '0', biddingDecimals),
             minimumBiddingAmountPerOrder: parseTokenAmount(minBidPerOrder || '0', biddingDecimals),
             minFundingThreshold: parseTokenAmount(minFunding, biddingDecimals),
             isAtomicClosureAllowed: atomicClose,
         });
-        if (ok) onCreated?.();
+        if (ok) onCreated?.({
+            id: 'pending',
+            auctioningToken,
+            auctioningTokenName: auctioningTokenSymbol || 'New Auction',
+            auctioningTokenSymbol: auctioningTokenSymbol || '',
+            biddingToken,
+            biddingTokenName: biddingTokenSymbol || '',
+            biddingTokenSymbol: biddingTokenSymbol || '',
+            auctionedSellAmount: parseTokenAmount(sellAmount, auctioningDecimals).toString(),
+            auctioningTokenDecimals: auctioningDecimals,
+            biddingTokenDecimals: biddingDecimals,
+            auctionEndDate: (baseTime + auctionMs).toString(),
+            minFundingThreshold: parseTokenAmount(minFunding, biddingDecimals).toString(),
+        } as Partial<IndexedAuction>);
         setStep('ready');
     };
 

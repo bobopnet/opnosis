@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { KNOWN_TOKENS } from '@opnosis/shared';
 import type { KnownToken } from '@opnosis/shared';
 import { API_BASE_URL } from '../constants.js';
@@ -73,6 +73,7 @@ export function TokenSelect({ value, onChange, network, label, help, excludeBidd
     const [showCustom, setShowCustom] = useState(isCustom);
     const [resolvedSymbol, setResolvedSymbol] = useState<string | null>(null);
     const [resolving, setResolving] = useState(false);
+    const customInputRef = useRef<HTMLInputElement>(null);
 
     // Resolve symbol when a custom address is entered (min length to avoid spam)
     useEffect(() => {
@@ -111,6 +112,7 @@ export function TokenSelect({ value, onChange, network, label, help, excludeBidd
             setResolvedSymbol(null);
             onChange('');
             onSymbolResolved?.('');
+            setTimeout(() => customInputRef.current?.focus(), 0);
         } else if (sel === '') {
             setShowCustom(false);
             setResolvedSymbol(null);
@@ -149,6 +151,7 @@ export function TokenSelect({ value, onChange, network, label, help, excludeBidd
             {showCustom && (
                 <>
                     <input
+                        ref={customInputRef}
                         style={s.customInput}
                         value={value}
                         onChange={(e) => onChange(e.target.value)}

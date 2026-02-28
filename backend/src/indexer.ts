@@ -218,18 +218,12 @@ async function parseAuctionResult(auctionId: number, raw: AuctionDataResult, blo
 
         const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, blockTimeMs, orderPlacementStartDate);
 
-        // Cancel window exists if the cancellation end is meaningfully between
-        // the order start and the auction end. When start is 0, check that
-        // the cancel-to-end gap is less than 90% of the total auction duration
-        // (otherwise the cancel window was essentially zero / set to creation time).
-        const effectiveStart = orderPlacementStartDate > 0n ? orderPlacementStartDate : cancellationEndDate;
-        const auctionDuration = auctionEndDate > effectiveStart ? auctionEndDate - effectiveStart : 1n;
-        const noCancelGap = auctionEndDate - cancellationEndDate;
+        // Cancel window exists if cancellationEndDate is set, before auction end,
+        // and at least 1 minute (60_000 ms) before auction end (to filter out
+        // zero-window auctions where cancel end was set to creation time).
         const hasCancelWindow = cancellationEndDate > 0n
             && cancellationEndDate < auctionEndDate
-            && (orderPlacementStartDate > 0n
-                ? cancellationEndDate > orderPlacementStartDate
-                : noCancelGap < auctionDuration * 90n / 100n);
+            && (auctionEndDate - cancellationEndDate) >= 60_000n;
 
         const [auctioningTokenName, auctioningTokenSymbol, biddingTokenName, biddingTokenSymbol, auctioningTokenDecimals, biddingTokenDecimals] = await Promise.all([
             resolveTokenName(auctioningToken),
@@ -461,6 +455,19 @@ export function getAuctions(): IndexedAuction[] {
 
 export function getAuction(id: number): IndexedAuction | undefined {
     return auctions.get(id);
+}
+
+/** Return the latest blockchain timestamp in milliseconds. */
+export async function getBlockTime(): Promise<string> {
+    try {
+        if (_provider) {
+            const bn = await _provider.getBlockNumber();
+            const block = await _provider.getBlock(bn) as unknown as BlockResult;
+            const t = BigInt(block.time ?? block.medianTime ?? 0);
+            if (t > 0n) return t.toString();
+        }
+    } catch { /* fall back */ }
+    return String(Date.now());
 }
 
 export async function getStats(): Promise<AuctionStats> {

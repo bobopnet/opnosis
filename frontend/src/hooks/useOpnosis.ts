@@ -90,8 +90,11 @@ export function useOpnosis(
     const resetTx = useCallback(() => setTxState(IDLE_TX), []);
 
     async function sendSimulation(simulation: SimResult): Promise<void> {
+        if (!simulation || typeof simulation !== 'object') {
+            throw new Error(`Simulation failed: ${String(simulation)}`);
+        }
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        if (simulation && 'error' in simulation) {
+        if ('error' in simulation) {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             throw new Error(String(simulation.error));
         }
@@ -266,10 +269,12 @@ export function useOpnosis(
             setTxState({ status: 'pending', message: 'Confirm approval in OP_WALLET...' });
             await sendSimulation(sim);
 
-            // Wait for approval TX to confirm on-chain before returning
-            setTxState({ status: 'pending', message: 'Waiting for approval to confirm...' });
-            for (let attempt = 0; attempt < 120; attempt++) {
-                await new Promise((r) => setTimeout(r, 5_000));
+            // Wait for approval TX to confirm on-chain before returning.
+            // Two separate TXs are required: approve then interact. The second TX
+            // will fail if the allowance hasn't been mined yet, so we must poll.
+            setTxState({ status: 'pending', message: 'Waiting for approval to confirm on-chain...' });
+            for (let attempt = 0; attempt < 150; attempt++) {
+                await new Promise((r) => setTimeout(r, 2_000));
                 try {
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                     const chk = await token.allowance(address, spenderAddr);
@@ -281,9 +286,11 @@ export function useOpnosis(
                 } catch {
                     // RPC hiccup — keep polling
                 }
-                setTxState({ status: 'pending', message: `Waiting for approval to confirm (${attempt + 1})...` });
+                const elapsed = Math.floor((attempt + 1) * 2 / 60);
+                const secs = ((attempt + 1) * 2) % 60;
+                setTxState({ status: 'pending', message: `Waiting for approval to confirm on-chain (${elapsed}m ${secs}s)...` });
             }
-            setTxState({ status: 'error', message: 'Approval timed out — try placing the bid again' });
+            setTxState({ status: 'error', message: 'Approval timed out — try again' });
             return false;
         } catch (err) {
             setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });
