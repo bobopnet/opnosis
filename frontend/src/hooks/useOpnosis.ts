@@ -17,12 +17,22 @@ import type { SimResult, TxState } from '@opnosis/shared';
 import { IDLE_TX } from '@opnosis/shared';
 import { OPNOSIS_CONTRACT } from '../constants.js';
 
+export interface PendingBid {
+    readonly auctionId: string;
+    readonly sellAmount: string;     // base units (after parseTokenAmount)
+    readonly buyAmount: string;      // base units (after parseTokenAmount)
+    readonly timestamp: number;      // Date.now() when placed
+}
+
 interface UseOpnosisReturn {
     readonly txState: TxState;
     readonly resetTx: () => void;
     readonly hexAddress: string;
     readonly completedKeys: Map<string, 'claimed' | 'cancelled'>;
     readonly markCompleted: (key: string, action: 'claimed' | 'cancelled') => void;
+    readonly pendingBids: readonly PendingBid[];
+    readonly addPendingBid: (auctionId: string, sellAmount: string, buyAmount: string) => void;
+    readonly removePendingBid: (auctionId: string, sellAmount: string, buyAmount: string) => void;
     readonly createAuction: (params: {
         auctioningToken: string;
         biddingToken: string;
@@ -53,6 +63,20 @@ export function useOpnosis(
     const [completedKeys, setCompletedKeys] = useState<Map<string, 'claimed' | 'cancelled'>>(new Map());
     const markCompleted = useCallback((key: string, action: 'claimed' | 'cancelled') => {
         setCompletedKeys((prev) => new Map(prev).set(key, action));
+    }, []);
+
+    const [pendingBids, setPendingBids] = useState<PendingBid[]>([]);
+    const addPendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string) => {
+        setPendingBids((prev) => [...prev, { auctionId, sellAmount, buyAmount, timestamp: Date.now() }]);
+    }, []);
+    const removePendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string) => {
+        setPendingBids((prev) => {
+            const idx = prev.findIndex((b) => b.auctionId === auctionId && b.sellAmount === sellAmount && b.buyAmount === buyAmount);
+            if (idx === -1) return prev;
+            const next = [...prev];
+            next.splice(idx, 1);
+            return next;
+        });
     }, []);
 
     const contract = useMemo(() => {
@@ -255,5 +279,5 @@ export function useOpnosis(
 
     const hexAddress = address?.toString() ?? '';
 
-    return { txState, resetTx, hexAddress, completedKeys, markCompleted, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
+    return { txState, resetTx, hexAddress, completedKeys, markCompleted, pendingBids, addPendingBid, removePendingBid, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

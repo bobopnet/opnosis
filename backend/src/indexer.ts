@@ -278,15 +278,17 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
         }
     }
 
-    // Invalidate order cache for settled auctions with unclaimed orders
-    // so claim/cancel state stays fresh.
+    // Invalidate order cache when order count changes (new bids) or
+    // for settled auctions with unclaimed orders (claim/cancel state).
     for (const [id, auction] of auctions) {
-        if (!auction.isSettled) continue;
         const orderCount = Number(auction.orderCount);
         if (orderCount === 0) continue;
         const cacheKey = `orders:${id}`;
         const cached = cache.get<IndexedOrder[]>(cacheKey);
-        if (cached && cached.some((o) => !o.cancelled && !o.claimed)) {
+        if (!cached) continue;
+        if (cached.length !== orderCount) {
+            cache.invalidate(cacheKey);
+        } else if (auction.isSettled && cached.some((o) => !o.cancelled && !o.claimed)) {
             cache.invalidate(cacheKey);
         }
     }

@@ -185,11 +185,14 @@ export function ResultsList({ stats }: Props) {
 
                             let clearingPrice = '--';
                             if (clearing) {
-                                const tokenRatio = Number(clearing.clearingSellAmount) / Number(clearing.clearingBuyAmount);
-                                if (usdPrice > 0) {
+                                // Human price = (sell / 10^biddingDec) / (buy / 10^auctioningDec)
+                                const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
+                                const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
+                                const tokenRatio = buyHuman > 0 ? sellHuman / buyHuman : 0;
+                                if (usdPrice > 0 && tokenRatio > 0) {
                                     clearingPrice = `$${(tokenRatio * usdPrice).toFixed(2)}`;
                                 } else {
-                                    clearingPrice = formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount)) + ` ${a.biddingTokenSymbol}`;
+                                    clearingPrice = formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount), a.biddingTokenDecimals, a.auctioningTokenDecimals) + ` ${a.biddingTokenSymbol}`;
                                 }
                             }
 

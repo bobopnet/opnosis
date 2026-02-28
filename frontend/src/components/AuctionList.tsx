@@ -114,14 +114,16 @@ const s = {
     } as React.CSSProperties,
 };
 
-function statusBadge(status: string): React.CSSProperties {
+function statusBadge(status: string, settling?: boolean): React.CSSProperties {
+    if (settling) return badgeStyle('purple');
     if (status === 'upcoming') return badgeStyle('purple');
     if (status === 'open' || status === 'cancellation_closed') return badgeStyle('amber');
     if (status === 'settled') return badgeStyle('success');
     return badgeStyle('muted');
 }
 
-function statusLabel(status: string): string {
+function statusLabel(status: string, settling?: boolean): string {
+    if (settling) return 'Settling...';
     if (status === 'open' || status === 'cancellation_closed') return 'In Progress';
     if (status === 'upcoming') return 'Upcoming';
     if (status === 'settled') return 'Settled';
@@ -235,6 +237,12 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
 
     const refresh = () => setFetchKey((k) => k + 1);
 
+    /* Auto-refresh every 15s to pick up settlement confirmations */
+    useEffect(() => {
+        const timer = setInterval(() => setFetchKey((k) => k + 1), 15_000);
+        return () => clearInterval(timer);
+    }, []);
+
     /* Two-way compute: Max USD <-> Min Receive */
     const canCompute = biddingTokenUsdPrice !== null && biddingTokenUsdPrice > 0;
 
@@ -347,7 +355,10 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     };
 
     const upcoming = auctions.filter((a) => a.status === 'upcoming');
-    const active = auctions.filter((a) => a.status === 'open' || a.status === 'cancellation_closed');
+    const active = auctions.filter((a) =>
+        a.status === 'open' || a.status === 'cancellation_closed'
+        || (settledIds.has(a.id) && !a.isSettled) // keep "Settling..." visible until backend confirms
+    );
 
     if (loading) return <div style={s.loading}>Loading auctions...</div>;
     if (upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
@@ -425,8 +436,11 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
 
             {/* Settlement Results */}
             {a.isSettled && clearing && (() => {
-                const tokenRatio = Number(clearing.clearingSellAmount) / Number(clearing.clearingBuyAmount);
-                const usdPerToken = biddingTokenUsdPrice !== null ? tokenRatio * biddingTokenUsdPrice : null;
+                // Human price = (sell / 10^biddingDec) / (buy / 10^auctioningDec)
+                const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
+                const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
+                const tokenRatio = buyHuman > 0 ? sellHuman / buyHuman : 0;
+                const usdPerToken = biddingTokenUsdPrice !== null && tokenRatio > 0 ? tokenRatio * biddingTokenUsdPrice : null;
                 return (
                     <div style={s.section}>
                         <div style={sectionTitleStyle}>Settlement Results</div>
@@ -437,7 +451,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                             </div>
                             <div>
                                 <div style={s.metaLabel}>Clearing Price ({a.biddingTokenSymbol})</div>
-                                <div style={s.metaValue}>{formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))}</div>
+                                <div style={s.metaValue}>{formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount), a.biddingTokenDecimals, a.auctioningTokenDecimals)}</div>
                             </div>
                             <div>
                                 <div style={s.metaLabel}>Total Distributed</div>
@@ -458,8 +472,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             )}
 
-            {/* Place Bid */}
-            {(a.status === 'open' || a.status === 'cancellation_closed') && (
+            {/* Place Bid — hide when settling */}
+            {(a.status === 'open' || a.status === 'cancellation_closed') && !settledIds.has(a.id) && (
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>Place Bid</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -542,6 +556,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         const isHovered = hoveredId === a.id;
         const isExpanded = expandedId === a.id;
         const isUpcoming = a.status === 'upcoming';
+        const isSettling = settledIds.has(a.id) && !a.isSettled;
         return (
             <div
                 key={a.id}
@@ -561,7 +576,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             >
                 <div style={s.cardHeader}>
                     <span style={s.cardTitle}>{a.auctioningTokenName || `Auction #${a.id}`}</span>
-                    <span style={statusBadge(a.status)}>{statusLabel(a.status)}</span>
+                    <span style={statusBadge(a.status, isSettling)}>{statusLabel(a.status, isSettling)}</span>
                 </div>
                 <div style={s.label}>Total Auction Tokens</div>
                 <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals)} {a.auctioningTokenSymbol}</div>

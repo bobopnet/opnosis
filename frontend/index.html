@@ -117,6 +117,12 @@
                 transform: translateY(-1px);
             }
 
+            /* Pending bid pulse animation */
+            @keyframes pendingPulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.5; }
+            }
+
             /* WalletConnect popup CSS fix — REQUIRED */
             .wallet-connect-modal,
             [class*="walletconnect"] [class*="modal"],

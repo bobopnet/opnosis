@@ -104,12 +104,13 @@ export const inputFocus: React.CSSProperties = {
     boxShadow: `0 0 0 3px rgba(155, 77, 187, 0.15)`,
 };
 
-export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple'): React.CSSProperties => {
+export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple' | 'pending'): React.CSSProperties => {
     const map = {
         amber: { bg: 'rgba(232, 148, 26, 0.15)', fg: color.amberLight },
         success: { bg: 'rgba(16, 185, 129, 0.15)', fg: color.success },
         muted: { bg: 'rgba(107, 101, 96, 0.2)', fg: color.textMuted },
         purple: { bg: 'rgba(107, 45, 123, 0.2)', fg: color.purpleLight },
+        pending: { bg: 'rgba(107, 45, 123, 0.15)', fg: color.purpleLight },
     };
     const { bg, fg } = map[variant];
     return {
@@ -123,6 +124,7 @@ export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple'): React.
         color: fg,
         letterSpacing: '0.03em',
         textTransform: 'uppercase',
+        ...(variant === 'pending' ? { animation: 'pendingPulse 2s ease-in-out infinite' } : {}),
     };
 };
 

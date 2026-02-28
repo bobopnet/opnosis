@@ -81,7 +81,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [rows, setRows] = useState<BidRow[]>([]);
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [clearings, setClearings] = useState<Map<string, IndexedClearing>>(new Map());
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [fetchKey, setFetchKey] = useState(0);
     const [busyKey, setBusyKey] = useState<string | null>(null); // which order or 'all'
 
@@ -89,6 +89,13 @@ export function MyBids({ connected, opnosis }: Props) {
     const busy = txState.status === 'pending';
 
     const refresh = useCallback(() => setFetchKey((k) => k + 1), []);
+
+    /* Auto-refresh every 30s so new bids appear without manual navigation */
+    useEffect(() => {
+        if (!connected) return;
+        const timer = setInterval(() => setFetchKey((k) => k + 1), 30_000);
+        return () => clearInterval(timer);
+    }, [connected]);
 
     /* Fetch all auctions, then orders for each, filter by wallet */
     useEffect(() => {
@@ -206,32 +213,38 @@ export function MyBids({ connected, opnosis }: Props) {
         refresh();
     };
 
-    /* ── Merge pending bids with real rows ────────────────────── */
+    /* ── Clean up matched/expired pending bids (side effect → useEffect) ── */
 
-    const displayRows: DisplayRow[] = useMemo(() => {
+    useEffect(() => {
         const now = Date.now();
-        const result: DisplayRow[] = [...rows];
-        const remaining: typeof pendingBids[number][] = [];
-
         for (const pb of pendingBids) {
-            // Expire after 5 minutes
             if (now - pb.timestamp > PENDING_EXPIRY_MS) {
                 removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
                 continue;
             }
-            // Check if a matching real order exists
             const matched = rows.some(
                 (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
             );
             if (matched) {
                 removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
-                continue;
             }
-            remaining.push(pb);
         }
+    }, [rows, pendingBids, removePendingBid]);
 
-        // Prepend synthetic rows for unmatched pending bids
-        for (const pb of remaining) {
+    /* ── Merge pending bids with real rows (pure — no side effects) ──── */
+
+    const displayRows: DisplayRow[] = useMemo(() => {
+        const now = Date.now();
+        const result: DisplayRow[] = [...rows];
+
+        // Add unmatched, non-expired pending bids as synthetic rows
+        for (const pb of pendingBids) {
+            if (now - pb.timestamp > PENDING_EXPIRY_MS) continue;
+            const matched = rows.some(
+                (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
+            );
+            if (matched) continue;
+
             const auction = auctions.find((a) => a.id === pb.auctionId);
             if (!auction) continue;
             result.unshift({
@@ -250,7 +263,7 @@ export function MyBids({ connected, opnosis }: Props) {
         }
 
         return result;
-    }, [rows, pendingBids, auctions, hexAddress, removePendingBid]);
+    }, [rows, pendingBids, auctions, hexAddress]);
 
     /* ── Render ─────────────────────────────────────────────────── */
 

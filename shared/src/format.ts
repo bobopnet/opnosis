@@ -35,12 +35,24 @@ export function formatTimestamp(ts: bigint): string {
     return new Date(ms).toLocaleString();
 }
 
-/** Format price as "X bidding tokens per 1 auctioning token". */
-export function formatPrice(minBuyAmount: bigint, sellAmount: bigint, decimals: number = TOKEN_DECIMALS): string {
-    if (sellAmount === 0n) return '0';
-    // price = minBuyAmount / sellAmount, scaled to decimal
-    const scaled = (minBuyAmount * 10n ** BigInt(decimals)) / sellAmount;
-    return formatTokenAmount(scaled, decimals);
+/**
+ * Format price as "X numerator tokens per 1 denominator token".
+ * Accounts for different decimal scales between the two tokens.
+ */
+export function formatPrice(
+    numeratorAmount: bigint,
+    denominatorAmount: bigint,
+    numeratorDecimals: number = TOKEN_DECIMALS,
+    denominatorDecimals: number = numeratorDecimals,
+): string {
+    if (denominatorAmount === 0n) return '0';
+    // human price = (numerator / 10^numDec) / (denominator / 10^denDec)
+    //             = numerator * 10^denDec / (denominator * 10^numDec)
+    // Scale by display precision for fixed-point formatting
+    const DISPLAY = 8;
+    const scaled = numeratorAmount * 10n ** BigInt(denominatorDecimals + DISPLAY)
+        / (denominatorAmount * 10n ** BigInt(numeratorDecimals));
+    return formatTokenAmount(scaled, DISPLAY);
 }
 
 /** Determine auction status from timestamps and settlement state. */
