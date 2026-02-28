@@ -59,7 +59,7 @@ export const btnPrimary: React.CSSProperties = {
     borderRadius: '8px',
     border: 'none',
     background: `linear-gradient(135deg, ${color.amber}, ${color.amberDim})`,
-    color: color.white,
+    color: '#000000',
     fontSize: '14px',
     fontWeight: 600,
     fontFamily: font.display,
