@@ -5,6 +5,7 @@
     "scripts": {
         "build": "asc src/opnosis/index.ts --target opnosis --measure --uncheckedBehavior never",
         "build:token": "asc src/orange-coin/index.ts --target orange-coin --measure --uncheckedBehavior never",
+        "build:link": "asc src/link-token/index.ts --target link-token --measure --uncheckedBehavior never",
         "format": "prettier --write .",
         "lint": "eslint . --fix"
     },

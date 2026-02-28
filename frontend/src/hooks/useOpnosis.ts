@@ -70,8 +70,27 @@ export function useOpnosis(
         }
         // CallResult.sendTransaction() handles signing via OP_WALLET internally.
         // signer/mldsaSigner = null → wallet extension signs the transaction.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        await simulation.sendTransaction({ signer: null, mldsaSigner: null, maximumAllowedSatToSpend: 0n, refundTo: walletAddress });
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+        const receipt = await simulation.sendTransaction({ signer: null, mldsaSigner: null, maximumAllowedSatToSpend: 0n, refundTo: walletAddress });
+
+        // broadcast success: true only means mempool accepted it — check receipt for execution result
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (receipt && typeof receipt === 'object') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (receipt.error) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                throw new Error(`Transaction failed: ${String(receipt.error)}`);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if (receipt.revert) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                throw new Error(`Transaction reverted: ${String(receipt.revert)}`);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            if ('success' in receipt && receipt.success === false) {
+                throw new Error('Transaction was not successful');
+            }
+        }
     }
 
     const createAuction: UseOpnosisReturn['createAuction'] = useCallback(async (params) => {

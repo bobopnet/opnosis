@@ -165,7 +165,7 @@ const s = {
         justifyContent: 'center',
         marginBottom: '40px',
     } as React.CSSProperties,
-    pill: {
+    pillBtn: {
         padding: '12px 24px',
         borderRadius: '40px',
         border: `1px solid ${color.borderStrong}`,
@@ -175,6 +175,8 @@ const s = {
         fontWeight: 500,
         color: color.textSecondary,
         boxShadow: '0 1px 8px rgba(0, 0, 0, 0.2)',
+        cursor: 'pointer',
+        transition: 'box-shadow 0.2s, transform 0.2s, border-color 0.2s',
     } as React.CSSProperties,
     pillIcon: {
         marginRight: '8px',
@@ -275,6 +277,7 @@ export function App() {
     const opnosis = useOpnosis(provider, network, address, walletAddress ?? undefined);
     const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
+    const [faqQuestion, setFaqQuestion] = useState<string | undefined>();
     const auctionsRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState<AuctionStats | null>(null);
 
@@ -295,6 +298,7 @@ export function App() {
     }, [refreshKey]);
 
     const onCreated = () => setRefreshKey((k) => k + 1);
+    const goToFaq = (id: string) => { setFaqQuestion(id); setTab('faq'); };
 
     const showHero = tab === 'main';
 
@@ -319,12 +323,12 @@ export function App() {
                 </div>
 
                 <nav style={s.nav} aria-label="Main navigation">
-                    <button style={s.navLink(tab === 'main')} onClick={() => setTab('main')}>Main</button>
-                    <button style={s.navLink(tab === 'browse')} onClick={() => setTab('browse')}>Browse</button>
-                    <button style={s.navLink(tab === 'mybids')} onClick={() => setTab('mybids')}>My Bids</button>
-                    <button style={s.navLink(tab === 'results')} onClick={() => setTab('results')}>Results</button>
-                    <button style={s.navLink(tab === 'create')} onClick={() => setTab('create')}>Create</button>
-                    <button style={s.navLink(tab === 'faq')} onClick={() => setTab('faq')}>FAQ</button>
+                    <button style={s.navLink(tab === 'main')} onClick={() => { setFaqQuestion(undefined); setTab('main'); }}>Main</button>
+                    <button style={s.navLink(tab === 'browse')} onClick={() => { setFaqQuestion(undefined); setTab('browse'); }}>Browse</button>
+                    <button style={s.navLink(tab === 'mybids')} onClick={() => { setFaqQuestion(undefined); setTab('mybids'); }}>My Bids</button>
+                    <button style={s.navLink(tab === 'results')} onClick={() => { setFaqQuestion(undefined); setTab('results'); }}>Results</button>
+                    <button style={s.navLink(tab === 'create')} onClick={() => { setFaqQuestion(undefined); setTab('create'); }}>Create</button>
+                    <button style={s.navLink(tab === 'faq')} onClick={() => { setFaqQuestion(undefined); setTab('faq'); }}>FAQ</button>
                 </nav>
 
                 <div>
@@ -368,14 +372,14 @@ export function App() {
                 {/* Feature pills (browse tab only) */}
                 {showHero && (
                     <div style={s.features}>
-                        <div style={s.pill}><span style={s.pillIcon}>&#9878;</span>Fair Pricing</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#9935;</span>Front-Running Resistant</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#9881;</span>Permissionless</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#127873;</span>Full Token Distribution</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</div>
-                        <div style={s.pill}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</div>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('clearing-price')}><span style={s.pillIcon}>&#9878;</span>Fair Pricing</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('fair-pricing')}><span style={s.pillIcon}>&#9935;</span>Front-Running Resistant</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('permissionless')}><span style={s.pillIcon}>&#9881;</span>Permissionless</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('bitcoin-native')}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('open-source')}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('full-distribution')}><span style={s.pillIcon}>&#127873;</span>Full Token Distribution</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('atomic-closure')}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('extendable')}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</button>
                     </div>
                 )}
 
@@ -403,7 +407,7 @@ export function App() {
                             onCreated={onCreated}
                         />
                     )}
-{tab === 'faq' && <FAQ />}
+{tab === 'faq' && <FAQ initialQuestion={faqQuestion} />}
                 </div>
             </main>
 

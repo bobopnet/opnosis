@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { color, font, card } from '../styles.js';
 
 /* ── Styles ────────────────────────────────────────────────────────── */
@@ -107,6 +107,7 @@ const s = {
 /* ── Data ──────────────────────────────────────────────────────────── */
 
 interface QA {
+    readonly id?: string;
     readonly q: string;
     readonly a: React.ReactNode;
 }
@@ -144,6 +145,7 @@ const sections: Section[] = [
                 a: 'Opnosis Auction is a permissionless batch auction platform running on Bitcoin Layer 1 via OPNet. It lets anyone create token auctions where all winning bidders pay the same uniform clearing price \u2014 ensuring fair and transparent price discovery.',
             },
             {
+                id: 'fair-pricing',
                 q: 'What is a batch auction? How is it different from a Dutch auction?',
                 a: <>
                     <strong>Batch auction:</strong> All bids are collected during a fixed window, then a single clearing price is computed so that every winner pays the same price. This prevents front-running and manipulation.
@@ -154,6 +156,7 @@ const sections: Section[] = [
                 </>,
             },
             {
+                id: 'permissionless',
                 q: 'Who can use Opnosis Auction \u2014 is it only for institutions?',
                 a: <>
                     Opnosis Auction is permissionless software. Anyone with an OP_WALLET &mdash; retail users, projects, DAOs, or institutions &mdash; can create auctions and place bids. There are no KYC requirements, minimum balances, or whitelists.
@@ -209,6 +212,7 @@ const sections: Section[] = [
                 a: 'The auction is considered unsuccessful. All bidding tokens are returned to bidders, and the auctioneer\u2019s sell tokens are returned. No fees are charged.',
             },
             {
+                id: 'atomic-closure',
                 q: 'What is atomic closure and should I enable it?',
                 a: <>
                     Atomic closure lets the auctioneer settle their auction early — before the scheduled end time. Only the auctioneer can trigger early settlement; no one else can.
@@ -234,6 +238,7 @@ const sections: Section[] = [
                 </>,
             },
             {
+                id: 'extendable',
                 q: 'Can I extend my auction after creating it?',
                 a: <>
                     Yes. As the auctioneer, you can extend both the cancel window end date and the auction end date at any time before settlement. Open the auction card on the Browse page and use the <strong>Extend Auction</strong> section (visible only to you).
@@ -264,6 +269,7 @@ const sections: Section[] = [
                 a: 'Yes, but only during the cancel window set by the auctioneer. Once the cancel window closes, all bids are final and cannot be withdrawn.',
             },
             {
+                id: 'clearing-price',
                 q: 'How is the clearing price determined?',
                 a: <>
                     After the auction ends, bids are sorted from highest to lowest price. The algorithm walks down the sorted list until all sell tokens are allocated. The price of the last winning bid becomes the clearing price, and every winner pays this same price.
@@ -272,6 +278,7 @@ const sections: Section[] = [
                 </>,
             },
             {
+                id: 'full-distribution',
                 q: 'What happens when there are more tokens than demand?',
                 a: <>
                     This is one of the most powerful features of batch auctions. When the total tokens available exceed what bidders asked for, <strong>all tokens are distributed proportionally</strong> to bidders based on their bid amounts &mdash; as long as the minimum funding threshold is met.
@@ -299,10 +306,12 @@ const sections: Section[] = [
         title: 'Technical',
         items: [
             {
+                id: 'bitcoin-native',
                 q: 'What network does Opnosis run on?',
                 a: 'Opnosis Auction runs on OPNet, a smart-contract layer on Bitcoin Layer 1. Transactions are secured by Bitcoin\u2019s proof-of-work consensus. The platform supports both testnet and mainnet.',
             },
             {
+                id: 'open-source',
                 q: 'Is the smart contract open source?',
                 a: <>
                     Yes. The entire Opnosis Auction codebase &mdash; smart contracts, frontend, and backend &mdash; is publicly available on{' '}
@@ -356,11 +365,19 @@ const sections: Section[] = [
 
 /* ── Component ─────────────────────────────────────────────────────── */
 
-function FAQItem({ q, a }: QA) {
+function FAQItem({ id, q, a, forceOpen }: QA & { forceOpen?: boolean }) {
     const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (forceOpen) {
+            setOpen(true);
+            setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+        }
+    }, [forceOpen]);
 
     return (
-        <div style={s.item} onClick={() => setOpen((v) => !v)}>
+        <div ref={ref} id={id} style={s.item} onClick={() => setOpen((v) => !v)}>
             <div style={s.question(open)}>
                 <span>{q}</span>
                 <span style={s.chevron(open)}>&#9660;</span>
@@ -370,7 +387,7 @@ function FAQItem({ q, a }: QA) {
     );
 }
 
-export function FAQ() {
+export function FAQ({ initialQuestion }: { initialQuestion?: string | undefined }) {
     return (
         <div style={s.container}>
             <div style={s.title}>Frequently Asked Questions</div>
@@ -382,7 +399,7 @@ export function FAQ() {
                 <div key={sec.title} style={s.section}>
                     <div style={s.sectionHeader}>{sec.title}</div>
                     {sec.items.map((item) => (
-                        <FAQItem key={item.q} q={item.q} a={item.a} />
+                        <FAQItem key={item.q} {...item} forceOpen={!!initialQuestion && item.id === initialQuestion} />
                     ))}
                 </div>
             ))}
