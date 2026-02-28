@@ -2,7 +2,6 @@
 import type { AuctionStatus } from '@opnosis/shared';
 
 export type {
-    WalletState,
     TxStatus,
     TxState,
     AuctionStatus,

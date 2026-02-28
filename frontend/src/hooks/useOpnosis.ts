@@ -4,10 +4,10 @@
  * Each method: simulate → check error → sendTransaction({ signer: null, mldsaSigner: null })
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { AbstractRpcProvider } from 'opnet';
 import { getContract } from 'opnet';
-import { networks } from '@btc-vision/bitcoin';
+import type { Network } from '@btc-vision/bitcoin';
 import { Address } from '@btc-vision/transaction';
 import {
     OpnosisContract,
@@ -41,80 +41,18 @@ interface UseOpnosisReturn {
     readonly approveToken: (tokenAddress: string, amount: bigint) => Promise<boolean>;
 }
 
-/**
- * Build a sender Address from the wallet's MLDSA hash + original public key.
- * The original 33-byte key enables CSV address derivation for spending timelocked UTXOs.
- * Falls back to tweaked pubkey (32-byte) if original key is unavailable.
- */
-async function resolveSenderAddress(
-    provider: AbstractRpcProvider,
-    walletAddress: string,
-    walletPublicKey?: string,
-): Promise<Address | undefined> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawKeys = await provider.getPublicKeysInfoRaw([walletAddress]) as any;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const info = rawKeys[walletAddress];
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (!info?.mldsaHashedPublicKey) return undefined;
-
-    // Prefer the original 33-byte classical key from OP_WALLET (enables CSV).
-    // Fall back to the 32-byte tweaked key from the RPC.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const legacyKey: string = walletPublicKey || info.originalPubKey || info.tweakedPubkey;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    const addr = Address.fromString('0x' + info.mldsaHashedPublicKey, legacyKey.startsWith('0x') ? legacyKey : '0x' + legacyKey);
-
-    // Attach full MLDSA public key metadata when available
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (info.mldsaPublicKey) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-        addr.originalMDLSAPublicKey = hexToBytes(info.mldsaPublicKey);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-        addr.mldsaLevel = info.mldsaLevel;
-    }
-
-    return addr;
-}
-
-function hexToBytes(hex: string): Uint8Array {
-    const h = hex.startsWith('0x') ? hex.slice(2) : hex;
-    const bytes = new Uint8Array(h.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = parseInt(h.substring(i * 2, i * 2 + 2), 16);
-    }
-    return bytes;
-}
-
-export function useOpnosis(provider: AbstractRpcProvider | null, network: string, walletAddress?: string, walletPublicKey?: string): UseOpnosisReturn {
+export function useOpnosis(
+    provider: AbstractRpcProvider | null,
+    btcNetwork: Network | null,
+    address: Address | null,
+    walletAddress?: string,
+): UseOpnosisReturn {
     const [txState, setTxState] = useState<TxState>(IDLE_TX);
-    const [senderAddress, setSenderAddress] = useState<Address | undefined>(undefined);
 
-    const btcNetwork = useMemo(
-        () => network === 'mainnet' ? networks.bitcoin : networks.opnetTestnet,
-        [network],
-    );
-
-    // Resolve sender Address once when wallet/provider change
-    useEffect(() => {
-        if (!provider || !walletAddress) {
-            setSenderAddress(undefined);
-            return;
-        }
-        let cancelled = false;
-        void resolveSenderAddress(provider, walletAddress, walletPublicKey).then((addr) => {
-            if (!cancelled) setSenderAddress(addr);
-        }).catch(() => {
-            if (!cancelled) setSenderAddress(undefined);
-        });
-        return () => { cancelled = true; };
-    }, [provider, walletAddress, walletPublicKey]);
-
-    // Create OpnosisContract with sender so all calls can use CSV UTXOs
     const contract = useMemo(() => {
-        if (!provider || !OPNOSIS_CONTRACT) return null;
-        return new OpnosisContract(OPNOSIS_CONTRACT, provider, btcNetwork, senderAddress);
-    }, [provider, btcNetwork, senderAddress]);
+        if (!provider || !btcNetwork || !OPNOSIS_CONTRACT) return null;
+        return new OpnosisContract(OPNOSIS_CONTRACT, provider, btcNetwork, address ?? undefined);
+    }, [provider, btcNetwork, address]);
 
     const resetTx = useCallback(() => setTxState(IDLE_TX), []);
 
@@ -238,8 +176,8 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
     }, [contract]);
 
     const approveToken: UseOpnosisReturn['approveToken'] = useCallback(async (tokenAddress, amount) => {
-        if (!provider) { setTxState({ status: 'error', message: 'Provider not initialized' }); return false; }
-        if (!senderAddress) { setTxState({ status: 'error', message: 'Wallet not connected' }); return false; }
+        if (!provider || !btcNetwork) { setTxState({ status: 'error', message: 'Provider not initialized' }); return false; }
+        if (!address) { setTxState({ status: 'error', message: 'Wallet not connected' }); return false; }
         setTxState({ status: 'pending', message: 'Resolving contract address...' });
         try {
             // Resolve Opnosis contract bech32 → Address for the spender
@@ -258,7 +196,7 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
 
             setTxState({ status: 'pending', message: 'Simulating approval...' });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const token = getContract(tokenAddress, OP_20_ABI, provider, btcNetwork, senderAddress) as any;
+            const token = getContract(tokenAddress, OP_20_ABI, provider, btcNetwork, address) as any;
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             const sim = await token.increaseAllowance(spenderAddr, amount);
             setTxState({ status: 'pending', message: 'Confirm approval in OP_WALLET...' });
@@ -270,7 +208,7 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
                 await new Promise((r) => setTimeout(r, 15_000));
                 try {
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                    const chk = await token.allowance(senderAddress, spenderAddr);
+                    const chk = await token.allowance(address, spenderAddr);
                     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                     const val: bigint = chk?.properties?.remaining ?? chk?.result?.remaining ?? 0n;
                     if (val >= amount) {
@@ -288,9 +226,9 @@ export function useOpnosis(provider: AbstractRpcProvider | null, network: string
             setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });
             return false;
         }
-    }, [provider, btcNetwork, senderAddress]);
+    }, [provider, btcNetwork, address]);
 
-    const hexAddress = senderAddress?.toString() ?? '';
+    const hexAddress = address?.toString() ?? '';
 
     return { txState, resetTx, hexAddress, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

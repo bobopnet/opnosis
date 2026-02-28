@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { useWallet } from './hooks/useWallet.js';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useWalletConnect } from '@btc-vision/walletconnect';
+import { networks } from '@btc-vision/bitcoin';
 import { useOpnosis } from './hooks/useOpnosis.js';
 import { AuctionList } from './components/AuctionList.js';
 import { MyBids } from './components/MyBids.js';
@@ -254,8 +255,24 @@ const s = {
 /* ── Component ────────────────────────────────────────────────────── */
 
 export function App() {
-    const { wallet, provider, connect, disconnect, error: walletError } = useWallet();
-    const opnosis = useOpnosis(provider, wallet.network, wallet.address || undefined, wallet.publicKey || undefined);
+    const {
+        walletAddress,
+        publicKey,
+        network,
+        address,
+        provider,
+        openConnectModal,
+        disconnect,
+        connecting,
+    } = useWalletConnect();
+
+    const connected = publicKey !== null;
+    const networkName = useMemo(
+        () => network === networks.bitcoin ? 'mainnet' : 'testnet',
+        [network],
+    );
+
+    const opnosis = useOpnosis(provider, network, address, walletAddress ?? undefined);
     const [tab, setTab] = useState<Tab>('main');
     const [refreshKey, setRefreshKey] = useState(0);
     const auctionsRef = useRef<HTMLDivElement>(null);
@@ -311,16 +328,16 @@ export function App() {
                 </nav>
 
                 <div>
-                    {wallet.connected ? (
+                    {connected && walletAddress ? (
                         <div style={s.walletInfo}>
                             <div style={s.walletAddr}>
-                                {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)} ({wallet.network})
+                                {walletAddress.slice(0, 8)}...{walletAddress.slice(-6)} ({networkName})
                             </div>
                             <button style={s.disconnectBtn} onClick={disconnect}>Disconnect</button>
                         </div>
                     ) : (
-                        <button style={s.connectBtn} onClick={() => void connect()}>
-                            Connect OP_WALLET
+                        <button style={s.connectBtn} onClick={openConnectModal} disabled={connecting}>
+                            {connecting ? 'Connecting...' : 'Connect Wallet'}
                         </button>
                     )}
                 </div>
@@ -328,7 +345,7 @@ export function App() {
 
             {/* ── Main ────────────────────────────────────────── */}
             <main style={s.main}>
-                {walletError && <div style={s.error}>{walletError}</div>}
+                {/* Wallet errors are handled by the WalletConnect modal */}
 
                 {/* Hero (browse tab only) */}
                 {showHero && (
@@ -374,13 +391,13 @@ export function App() {
 
                 {/* Tab content */}
                 <div ref={auctionsRef} style={s.content}>
-                    {tab === 'browse' && <AuctionList connected={wallet.connected} opnosis={opnosis} refreshKey={refreshKey} />}
-                    {tab === 'mybids' && <MyBids connected={wallet.connected} opnosis={opnosis} />}
+                    {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} />}
+                    {tab === 'mybids' && <MyBids connected={connected} opnosis={opnosis} />}
                     {tab === 'results' && <ResultsList stats={stats} />}
                     {tab === 'create' && (
                         <CreateAuction
-                            connected={wallet.connected}
-                            network={wallet.network}
+                            connected={connected}
+                            network={networkName}
                             opnosis={opnosis}
                             onCreated={onCreated}
                         />

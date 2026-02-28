@@ -13,6 +13,7 @@
         "@btc-vision/bitcoin": "^7.0.0-rc.6",
         "@btc-vision/ecpair": "^4.0.5",
         "@btc-vision/transaction": "^1.8.0-rc.9",
+        "@btc-vision/walletconnect": "^1.10.3",
         "@opnosis/shared": "file:../shared",
         "opnet": "^1.8.1-rc.14",
         "react": "^19.2.4",
