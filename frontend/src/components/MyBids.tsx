@@ -297,8 +297,9 @@ export function MyBids({ connected, opnosis }: Props) {
     const claimableCount = rows.filter((r) => {
         const key = bidKey(r.auction.id, r.order.orderId);
         const done = completedKeys.get(key);
-        return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
+        const isClaimable = r.auction.isSettled && !r.order.cancelled && !r.order.claimed
             && done !== 'claimed' && done !== 'cancelled';
+        return isClaimable;
     }).length;
 
     return (
@@ -350,14 +351,21 @@ export function MyBids({ connected, opnosis }: Props) {
                             const doneAction = completedKeys.get(key);
                             const isClaimed = o.claimed || doneAction === 'claimed';
                             const isCancelled = o.cancelled || doneAction === 'cancelled';
-                            const hasCancelWindow = BigInt(a.cancellationEndDate) > BigInt(a.orderPlacementStartDate || '0');
-                            const canCancel = hasCancelWindow && !a.isSettled && a.status === 'open' && !isCancelled && !isClaimed;
+                            const canCancel = a.hasCancelWindow && !a.isSettled && a.status === 'open' && !isCancelled && !isClaimed;
                             const canClaim = a.isSettled && !isCancelled && !isClaimed;
+
+                            const minFunding = BigInt(a.minFundingThreshold || '0');
+                            const totalBid = BigInt(a.totalBidAmount || '0');
+                            const isFailed = a.fundingNotReached
+                                || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBid < minFunding);
+                            const canClaimRefund = isFailed && a.isSettled && !isClaimed && !isCancelled;
 
                             let statusText = 'Active';
                             let statusVariant: 'amber' | 'success' | 'muted' = 'amber';
                             if (isCancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
+                            else if (isFailed && isClaimed) { statusText = 'Refunded'; statusVariant = 'success'; }
                             else if (isClaimed) { statusText = 'Claimed'; statusVariant = 'success'; }
+                            else if (isFailed) { statusText = 'Cancelled'; statusVariant = 'muted'; }
 
                             return (
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
@@ -367,7 +375,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
                                     <td style={s.td}>{(() => {
-                                        if (isCancelled) return '--';
+                                        if (isCancelled || isFailed) return '--';
                                         const cl = clearings.get(a.id);
                                         if (!cl || !a.isSettled) return '--';
                                         const sell = BigInt(o.sellAmount);
@@ -387,13 +395,21 @@ export function MyBids({ connected, opnosis }: Props) {
                                                 onClick={() => void handleCancel(r)}
                                             >{busyKey === key ? 'Processing...' : 'Cancel'}</button>
                                         )}
-                                        {canClaim && (
+                                        {canClaim && !isFailed && (
                                             <button
                                                 className="glow-amber"
                                                 style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
                                                 disabled={busy}
                                                 onClick={() => void handleClaim(r)}
                                             >{busyKey === key ? 'Processing...' : 'Claim'}</button>
+                                        )}
+                                        {canClaimRefund && (
+                                            <button
+                                                className="glow-purple"
+                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
+                                                disabled={busy}
+                                                onClick={() => void handleClaim(r)}
+                                            >{busyKey === key ? 'Processing...' : 'Claim Refund'}</button>
                                         )}
                                     </td>
                                 </tr>

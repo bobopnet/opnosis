@@ -114,7 +114,8 @@ const s = {
     } as React.CSSProperties,
 };
 
-function statusBadge(status: string, settling?: boolean): React.CSSProperties {
+function statusBadge(status: string, settling?: boolean, failed?: boolean): React.CSSProperties {
+    if (failed) return badgeStyle('muted');
     if (settling) return badgeStyle('purple');
     if (status === 'upcoming') return badgeStyle('purple');
     if (status === 'open' || status === 'cancellation_closed') return badgeStyle('amber');
@@ -122,7 +123,8 @@ function statusBadge(status: string, settling?: boolean): React.CSSProperties {
     return badgeStyle('muted');
 }
 
-function statusLabel(status: string, settling?: boolean): string {
+function statusLabel(status: string, settling?: boolean, failed?: boolean): string {
+    if (failed) return 'Failed';
     if (settling) return 'Settling...';
     if (status === 'open' || status === 'cancellation_closed') return 'In Progress';
     if (status === 'upcoming') return 'Upcoming';
@@ -363,7 +365,12 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
     if (loading) return <div style={s.loading}>Loading auctions...</div>;
     if (upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
 
-    const renderExpandedDetail = (a: IndexedAuction) => (
+    const renderExpandedDetail = (a: IndexedAuction) => {
+        const _minFunding = BigInt(a.minFundingThreshold || '0');
+        const _totalBid = BigInt(a.totalBidAmount || '0');
+        const isFailed = a.fundingNotReached
+            || (a.status === 'ended' && !a.isSettled && _minFunding > 0n && _totalBid < _minFunding);
+        return (
         <div style={s.detail}>
             {/* Token addresses */}
             <div style={s.metaGrid}>
@@ -391,8 +398,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             </div>
 
-            {/* Cancel window — only show if cancellation ends after order placement starts (i.e. a real window exists) */}
-            {BigInt(a.cancellationEndDate) > 0n && BigInt(a.cancellationEndDate) > BigInt(a.orderPlacementStartDate || '0') && BigInt(a.cancellationEndDate) > BigInt(Date.now()) && (
+            {/* Cancel window — only show when a cancel window was configured */}
+            {a.hasCancelWindow && !a.isSettled && (
                 <div style={{ marginBottom: '8px' }}>
                     <div style={s.metaLabel}>Cancel Window Ends</div>
                     <div style={s.metaValue}>{formatTimestamp(BigInt(a.cancellationEndDate))}</div>
@@ -435,7 +442,15 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
 
             {/* Settlement Results */}
-            {a.isSettled && clearing && (() => {
+            {isFailed && (
+                <div style={s.section}>
+                    <div style={sectionTitleStyle}>Settlement Results</div>
+                    <div style={{ color: color.textMuted, fontFamily: font.body, fontSize: '15px' }}>
+                        Min Funding Not Met — all bids are refundable.{a.isSettled ? ' Use "Claim Refund" in My Bids to reclaim your tokens.' : ' Once the auction is settled, you can claim your refund from the My Bids tab.'}
+                    </div>
+                </div>
+            )}
+            {a.isSettled && !isFailed && clearing && (() => {
                 // Human price = (sell / 10^biddingDec) / (buy / 10^auctioningDec)
                 const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
                 const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
@@ -504,18 +519,30 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 </div>
             )}
 
-            {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open */}
-            {!settledIds.has(a.id) && (a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (
-                <div style={s.section}>
-                    <div style={sectionTitleStyle}>{a.status === 'ended' ? 'Settlement' : 'Atomic Closure'}</div>
-                    <button
-                        className="glow-amber"
-                        style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
-                        disabled={busy || !connected}
-                        onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
-                    >{busyAction === 'settle' ? 'Settling...' : a.status === 'ended' ? 'Settle Auction' : 'Settle Now'}</button>
-                </div>
-            )}
+            {/* Settle — anyone after auction ends, or auctioneer via atomic closure while open (only if min funding met) */}
+            {!settledIds.has(a.id) && (a.status === 'ended' || (a.isAtomicClosureAllowed && !a.isSettled && a.status !== 'upcoming' && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase())) && (() => {
+                const isAtomicClosure = a.status !== 'ended';
+                const totalBid = BigInt(a.totalBidAmount || '0');
+                const minFunding = BigInt(a.minFundingThreshold || '0');
+                const fundingMet = minFunding === 0n || totalBid >= minFunding;
+                const atomicDisabled = isAtomicClosure && !fundingMet;
+                return (
+                    <div style={s.section}>
+                        <div style={sectionTitleStyle}>{isAtomicClosure ? 'Atomic Closure' : 'Settlement'}</div>
+                        <button
+                            className="glow-amber"
+                            style={{ ...btnPrimary, ...((busy || !connected || atomicDisabled) ? btnDisabled : {}) }}
+                            disabled={busy || !connected || atomicDisabled}
+                            onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
+                        >{busyAction === 'settle' ? 'Settling...' : isAtomicClosure ? 'Settle Now' : 'Settle Auction'}</button>
+                        {atomicDisabled && (
+                            <div style={{ fontSize: '12px', color: color.textMuted, marginTop: '8px' }}>
+                                Min funding threshold not yet met ({formatTokenAmount(totalBid, a.biddingTokenDecimals)} / {formatTokenAmount(minFunding, a.biddingTokenDecimals)} {a.biddingTokenSymbol})
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Manual Claim (fallback) */}
             {a.isSettled && connected && (
@@ -551,12 +578,17 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
         </div>
     );
+    };
 
     const renderCard = (a: IndexedAuction) => {
         const isHovered = hoveredId === a.id;
         const isExpanded = expandedId === a.id;
         const isUpcoming = a.status === 'upcoming';
         const isSettling = settledIds.has(a.id) && !a.isSettled;
+        const minFunding = BigInt(a.minFundingThreshold || '0');
+        const totalBid = BigInt(a.totalBidAmount || '0');
+        const isFailed = a.fundingNotReached
+            || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBid < minFunding);
         return (
             <div
                 key={a.id}
@@ -576,7 +608,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             >
                 <div style={s.cardHeader}>
                     <span style={s.cardTitle}>{a.auctioningTokenName || `Auction #${a.id}`}</span>
-                    <span style={statusBadge(a.status, isSettling)}>{statusLabel(a.status, isSettling)}</span>
+                    <span style={statusBadge(a.status, isSettling, isFailed)}>{statusLabel(a.status, isSettling, isFailed)}</span>
                 </div>
                 <div style={s.label}>Total Auction Tokens</div>
                 <div style={s.value}>{formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals)} {a.auctioningTokenSymbol}</div>

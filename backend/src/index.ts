@@ -12,22 +12,22 @@
  */
 
 import HyperExpress from '@btc-vision/hyper-express';
-import { OpnosisContract, getNetworkConfig } from '@opnosis/shared';
-import { config, provider } from './config.js';
+import { OpnosisContract } from '@opnosis/shared';
+import { config, provider, networkConfig, wallet, txParams } from './config.js';
 import { Cache } from './cache.js';
 import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats } from './indexer.js';
 import { getTokenUsdPrice } from './pricefeed.js';
 
-const networkConfig = getNetworkConfig(config.network);
 const contract = new OpnosisContract(
     config.contractAddress,
     provider,
     networkConfig.btcNetwork,
+    wallet?.address,
 );
 
 const cache = new Cache(config.cacheTtlMs);
 
-startIndexer(contract, cache, config.indexerPollMs, provider, networkConfig.btcNetwork);
+startIndexer(contract, cache, config.indexerPollMs, provider, networkConfig.btcNetwork, txParams);
 
 // -- HTTP server ---------------------------------------------------------------
 
@@ -198,3 +198,4 @@ console.log(`Opnosis Auction backend running on port ${config.port}`);
 console.log(`  Network : ${config.network}`);
 console.log(`  Contract: ${config.contractAddress}`);
 console.log(`  Indexer : polling every ${config.indexerPollMs}ms`);
+console.log(`  Auto-settle: ${txParams ? 'enabled' : 'disabled (no MNEMONIC)'}`);

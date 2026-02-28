@@ -167,10 +167,17 @@ export function ResultsList({ stats }: Props) {
                     </thead>
                     <tbody>
                         {rows.map(({ auction: a, clearing, usdPrice }) => {
+                            const minFunding = BigInt(a.minFundingThreshold || '0');
+                            const totalBidAmt = BigInt(a.totalBidAmount || '0');
+                            const isFailed = a.fundingNotReached
+                                || (a.status === 'ended' && !a.isSettled && minFunding > 0n && totalBidAmt < minFunding);
+
                             // Compute actual raised from clearing data (clearing price × tokens sold)
                             // totalBidAmount includes excess refunded to bidders
                             let raisedTokens: bigint;
-                            if (clearing) {
+                            if (isFailed) {
+                                raisedTokens = 0n;
+                            } else if (clearing) {
                                 const sellAmt = BigInt(a.auctionedSellAmount);
                                 const clearBuy = BigInt(clearing.clearingBuyAmount);
                                 const clearSell = BigInt(clearing.clearingSellAmount);
@@ -179,12 +186,12 @@ export function ResultsList({ stats }: Props) {
                                 raisedTokens = BigInt(a.totalBidAmount || '0');
                             }
                             const raisedHuman = Number(raisedTokens) / (10 ** a.biddingTokenDecimals);
-                            const usdValue = usdPrice > 0 && raisedHuman > 0
+                            const usdValue = !isFailed && usdPrice > 0 && raisedHuman > 0
                                 ? `$${(raisedHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                 : '--';
 
                             let clearingPrice = '--';
-                            if (clearing) {
+                            if (!isFailed && clearing) {
                                 // Human price = (sell / 10^biddingDec) / (buy / 10^auctioningDec)
                                 const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
                                 const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
@@ -207,17 +214,17 @@ export function ResultsList({ stats }: Props) {
                                         {formatTokenAmount(BigInt(a.auctionedSellAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}
                                     </td>
                                     <td style={s.td}>
-                                        {formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}
+                                        {isFailed ? '--' : `${formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`}
                                     </td>
                                     <td style={s.td}>{usdValue}</td>
                                     <td style={s.td}>
-                                        <span style={{ color: isSettled ? color.amber : color.textMuted, fontWeight: isSettled ? 600 : 400 }}>
+                                        <span style={{ color: isSettled && !isFailed ? color.amber : color.textMuted, fontWeight: isSettled && !isFailed ? 600 : 400 }}>
                                             {clearingPrice}
                                         </span>
                                     </td>
                                     <td style={s.td}>
-                                        <span style={badgeStyle(isSettled ? 'success' : 'muted')}>
-                                            {isSettled ? 'Settled' : 'Ended'}
+                                        <span style={badgeStyle(isFailed ? 'muted' : isSettled ? 'success' : 'muted')}>
+                                            {isFailed ? 'Failed' : isSettled ? 'Settled' : 'Ended'}
                                         </span>
                                     </td>
                                 </tr>

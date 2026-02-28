@@ -209,7 +209,13 @@ const sections: Section[] = [
             },
             {
                 q: 'What happens if the minimum funding threshold isn\u2019t met?',
-                a: 'The auction is considered unsuccessful. All bidding tokens are returned to bidders, and the auctioneer\u2019s sell tokens are returned. No fees are charged.',
+                a: <>
+                    The auction is marked as <strong>Failed</strong> and no fees are charged. All bidding tokens are fully refundable to bidders, and the auctioneer&apos;s sell tokens are returned.
+                    <br /><br />
+                    Your bids will automatically show as <strong>&ldquo;Cancelled&rdquo;</strong> in the <strong>My Bids</strong> tab because the auction did not reach the minimum funding required for settlement to proceed. This is not a manual cancellation &mdash; it happens automatically when the auction ends without enough total bids.
+                    <br /><br />
+                    Once the auction is settled on-chain, a <strong>Claim Refund</strong> button will appear next to each cancelled bid. Click it to reclaim your full bidding token amount. The settlement process is automatic and typically happens shortly after the auction ends.
+                </>,
             },
             {
                 id: 'atomic-closure',

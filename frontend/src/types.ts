@@ -62,4 +62,6 @@ export interface IndexedAuction {
     readonly auctioningTokenDecimals: number;
     readonly biddingTokenDecimals: number;
     readonly auctioneerAddress: string;
+    readonly hasCancelWindow: boolean;
+    readonly fundingNotReached: boolean;
 }

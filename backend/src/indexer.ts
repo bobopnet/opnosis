@@ -3,7 +3,7 @@
  */
 
 import { getContract, OP_20_ABI } from 'opnet';
-import type { AbstractRpcProvider } from 'opnet';
+import type { AbstractRpcProvider, TransactionParameters } from 'opnet';
 import type { Network } from '@btc-vision/bitcoin';
 import { OpnosisContract, getAuctionStatus } from '@opnosis/shared';
 import type { AuctionStatus } from '@opnosis/shared';
@@ -33,6 +33,8 @@ export interface IndexedAuction {
     readonly auctioningTokenDecimals: number;
     readonly biddingTokenDecimals: number;
     readonly auctioneerAddress: string;
+    readonly hasCancelWindow: boolean;
+    readonly fundingNotReached: boolean;
 }
 
 export interface IndexedClearing {
@@ -64,6 +66,10 @@ const auctions = new Map<number, IndexedAuction>();
 const clearings = new Map<number, IndexedClearing>();
 let highestKnownId = 0;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+// Auto-settle state
+const settleAttempted = new Set<number>();
+let _txParams: TransactionParameters | null = null;
 
 // Token metadata cache
 const tokenNames = new Map<string, string>();
@@ -127,7 +133,7 @@ async function resolveTokenDecimals(address: string): Promise<number> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedAuction | null> {
+async function parseAuctionResult(auctionId: number, raw: any, blockTimeMs?: bigint): Promise<IndexedAuction | null> {
     try {
         // The opnet SDK decodes outputs into `properties` (not `result`)
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
@@ -147,6 +153,8 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
         const cancellationEndDate = BigInt(r.cancellationEndDate ?? 0);
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const isSettled = Boolean(r.isSettled ?? false);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const fundingNotReached = Boolean(r.fundingNotReached ?? false);
 
         // The SDK only decodes 14 fields from getAuctionData; the 15th field
         // (auctioneerAddress) is in the raw BinaryReader at byte offset 355.
@@ -170,7 +178,20 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
             // Fallback: auctioneerAddress stays empty
         }
 
-        const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, undefined, orderPlacementStartDate);
+        const status = getAuctionStatus(cancellationEndDate, auctionEndDate, isSettled, blockTimeMs, orderPlacementStartDate);
+
+        // Cancel window exists if the cancellation end is meaningfully between
+        // the order start and the auction end. When start is 0, check that
+        // the cancel-to-end gap is less than 90% of the total auction duration
+        // (otherwise the cancel window was essentially zero / set to creation time).
+        const effectiveStart = orderPlacementStartDate > 0n ? orderPlacementStartDate : cancellationEndDate;
+        const auctionDuration = auctionEndDate > effectiveStart ? auctionEndDate - effectiveStart : 1n;
+        const noCancelGap = auctionEndDate - cancellationEndDate;
+        const hasCancelWindow = cancellationEndDate > 0n
+            && cancellationEndDate < auctionEndDate
+            && (orderPlacementStartDate > 0n
+                ? cancellationEndDate > orderPlacementStartDate
+                : noCancelGap < auctionDuration * 90n / 100n);
 
         const [auctioningTokenName, auctioningTokenSymbol, biddingTokenName, biddingTokenSymbol, auctioningTokenDecimals, biddingTokenDecimals] = await Promise.all([
             resolveTokenName(auctioningToken),
@@ -210,6 +231,8 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
             auctioningTokenDecimals,
             biddingTokenDecimals,
             auctioneerAddress,
+            hasCancelWindow,
+            fundingNotReached,
         };
     } catch {
         return null;
@@ -220,13 +243,28 @@ async function parseAuctionResult(auctionId: number, raw: any): Promise<IndexedA
 const MAX_PROBE_AHEAD = 50;
 
 async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> {
+    // Fetch blockchain time for accurate status computation (can be hours ahead of wall clock)
+    let blockTimeMs = BigInt(Date.now());
+    try {
+        if (_provider) {
+            const bn = await _provider.getBlockNumber();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const block = await _provider.getBlock(bn) as any;
+            // Use block.time (latest block timestamp) rather than medianTime which lags
+            // behind by several blocks. This provides more accurate status for UI.
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            const t = BigInt(block.time ?? block.medianTime ?? 0);
+            if (t > 0n) blockTimeMs = t;
+        }
+    } catch { /* fall back to Date.now() */ }
+
     // Discover new auctions (bounded to MAX_PROBE_AHEAD to prevent infinite loops)
     let probeId = highestKnownId + 1;
     const probeLimit = highestKnownId + 1 + MAX_PROBE_AHEAD;
     for (; probeId <= probeLimit;) {
         try {
             const raw = await contract.getAuctionData(BigInt(probeId));
-            const parsed = await parseAuctionResult(probeId, raw);
+            const parsed = await parseAuctionResult(probeId, raw, blockTimeMs);
             if (!parsed) break;
             auctions.set(probeId, parsed);
             cache.invalidate(`auction:${probeId}`);
@@ -247,7 +285,7 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
         if (auction.isSettled) continue;
         try {
             const raw = await contract.getAuctionData(BigInt(id));
-            const parsed = await parseAuctionResult(id, raw);
+            const parsed = await parseAuctionResult(id, raw, blockTimeMs);
             if (parsed) {
                 auctions.set(id, parsed);
                 cache.invalidate(`auction:${id}`);
@@ -311,6 +349,29 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
             // totalBidAmount stays at previous value
         }
     }
+
+    // Auto-settle ended auctions (one attempt per auction)
+    if (_txParams) {
+        for (const [id, auction] of auctions) {
+            if (auction.isSettled || auction.status !== 'ended') continue;
+            if (settleAttempted.has(id)) continue;
+            settleAttempted.add(id);
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                const sim = await contract.simulateSettle(BigInt(id));
+                if ('error' in (sim as object)) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+                    console.warn(`Auto-settle auction ${id} simulation error:`, sim.error);
+                    continue;
+                }
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+                await sim.sendTransaction(_txParams);
+                console.log(`Auto-settled auction ${id}`);
+            } catch (err) {
+                console.warn(`Auto-settle auction ${id} failed:`, err);
+            }
+        }
+    }
 }
 
 export function startIndexer(
@@ -319,10 +380,12 @@ export function startIndexer(
     intervalMs: number,
     provider: AbstractRpcProvider,
     network: Network,
+    txParams?: TransactionParameters | null,
 ): void {
     if (pollTimer) return;
     _provider = provider;
     _network = network;
+    _txParams = txParams ?? null;
     initPriceFeed();
     // Initial poll
     void pollOnce(contract, cache);
