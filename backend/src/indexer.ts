@@ -10,6 +10,66 @@ import type { AuctionStatus } from '@opnosis/shared';
 import { Cache } from './cache.js';
 import { getTokenUsdPrice, initPriceFeed } from './pricefeed.js';
 
+// Typed interfaces for opnet SDK return values (avoids `as any`)
+interface OP20StringResult {
+    properties: { name?: string; symbol?: string; [key: string]: unknown };
+}
+
+interface OP20DecimalsResult {
+    properties: { decimals?: number; [key: string]: unknown };
+}
+
+interface OP20Contract {
+    name(): Promise<OP20StringResult>;
+    symbol(): Promise<OP20StringResult>;
+    decimals(): Promise<OP20DecimalsResult>;
+}
+
+interface BinaryReader {
+    setOffset(offset: number): void;
+    readAddress(): unknown;
+    readU256(): bigint;
+    readBoolean(): boolean;
+    buffer: ArrayBuffer;
+}
+
+interface AuctionDataResult {
+    properties: {
+        auctioningToken?: string;
+        biddingToken?: string;
+        orderPlacementStartDate?: bigint;
+        auctionEndDate?: bigint;
+        cancellationEndDate?: bigint;
+        isSettled?: boolean;
+        fundingNotReached?: boolean;
+        auctionedSellAmount?: string;
+        minBuyAmount?: string;
+        minimumBiddingAmountPerOrder?: string;
+        minFundingThreshold?: string;
+        isAtomicClosureAllowed?: boolean;
+        orderCount?: string;
+        [key: string]: unknown;
+    };
+    result?: BinaryReader;
+}
+
+interface BlockResult {
+    time?: number;
+    medianTime?: number;
+}
+
+interface ClearingResult {
+    properties: {
+        clearingBuyAmount?: string;
+        clearingSellAmount?: string;
+        [key: string]: unknown;
+    };
+}
+
+interface OrdersResult {
+    result?: BinaryReader;
+}
+
 export interface IndexedAuction {
     readonly id: string;
     readonly auctioningToken: string;
@@ -82,11 +142,8 @@ async function resolveTokenName(address: string): Promise<string> {
     if (tokenNames.has(address)) return tokenNames.get(address)!;
     if (!_provider || !_network) return 'Unknown';
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const token = getContract(address, OP_20_ABI, _provider, _network) as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const token = getContract(address, OP_20_ABI, _provider, _network) as unknown as OP20Contract;
         const result = await token.name();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const name = String(result?.properties?.name ?? 'Unknown');
         tokenNames.set(address, name);
         return name;
@@ -100,11 +157,8 @@ async function resolveTokenSymbol(address: string): Promise<string> {
     if (tokenSymbols.has(address)) return tokenSymbols.get(address)!;
     if (!_provider || !_network) return '???';
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const token = getContract(address, OP_20_ABI, _provider, _network) as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const token = getContract(address, OP_20_ABI, _provider, _network) as unknown as OP20Contract;
         const result = await token.symbol();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const sym = String(result?.properties?.symbol ?? '???');
         tokenSymbols.set(address, sym);
         return sym;
@@ -118,11 +172,8 @@ async function resolveTokenDecimals(address: string): Promise<number> {
     if (tokenDecimals.has(address)) return tokenDecimals.get(address)!;
     if (!_provider || !_network) return 18;
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const token = getContract(address, OP_20_ABI, _provider, _network) as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const token = getContract(address, OP_20_ABI, _provider, _network) as unknown as OP20Contract;
         const result = await token.decimals();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const dec = Number(result?.properties?.decimals ?? 18);
         tokenDecimals.set(address, dec);
         return dec;
@@ -132,28 +183,18 @@ async function resolveTokenDecimals(address: string): Promise<number> {
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function parseAuctionResult(auctionId: number, raw: any, blockTimeMs?: bigint): Promise<IndexedAuction | null> {
+async function parseAuctionResult(auctionId: number, raw: AuctionDataResult, blockTimeMs?: bigint): Promise<IndexedAuction | null> {
     try {
-        // The opnet SDK decodes outputs into `properties` (not `result`)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         const r = raw?.properties;
         if (!r) return null;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const auctioningToken = String(r.auctioningToken ?? '');
         if (!auctioningToken) return null;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const biddingToken = String(r.biddingToken ?? '');
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const orderPlacementStartDate = BigInt(r.orderPlacementStartDate ?? 0);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const auctionEndDate = BigInt(r.auctionEndDate ?? 0);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const cancellationEndDate = BigInt(r.cancellationEndDate ?? 0);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const isSettled = Boolean(r.isSettled ?? false);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const fundingNotReached = Boolean(r.fundingNotReached ?? false);
 
         // The SDK only decodes 14 fields from getAuctionData; the 15th field
@@ -161,13 +202,9 @@ async function parseAuctionResult(auctionId: number, raw: any, blockTimeMs?: big
         // Layout: 2 addr(64) + 9 u256(288) + 3 bool(3) = 355, then 1 addr(32).
         let auctioneerAddress = '';
         try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             const reader = raw?.result;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             if (reader && typeof reader.setOffset === 'function' && reader.buffer?.byteLength >= 387) {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 reader.setOffset(355);
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
                 const addr = reader.readAddress();
                 const addrStr = String(addr ?? '');
                 if (addrStr && addrStr !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
@@ -213,17 +250,11 @@ async function parseAuctionResult(auctionId: number, raw: any, blockTimeMs?: big
             orderPlacementStartDate: orderPlacementStartDate.toString(),
             auctionEndDate: auctionEndDate.toString(),
             cancellationEndDate: cancellationEndDate.toString(),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             auctionedSellAmount: String(r.auctionedSellAmount ?? '0'),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             minBuyAmount: String(r.minBuyAmount ?? '0'),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             minimumBiddingAmountPerOrder: String(r.minimumBiddingAmountPerOrder ?? '0'),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             minFundingThreshold: String(r.minFundingThreshold ?? '0'),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             isAtomicClosureAllowed: Boolean(r.isAtomicClosureAllowed ?? false),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             orderCount: String(r.orderCount ?? '0'),
             totalBidAmount: '0',
             isSettled,
@@ -248,11 +279,9 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
     try {
         if (_provider) {
             const bn = await _provider.getBlockNumber();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const block = await _provider.getBlock(bn) as any;
+            const block = await _provider.getBlock(bn) as unknown as BlockResult;
             // Use block.time (latest block timestamp) rather than medianTime which lags
             // behind by several blocks. This provides more accurate status for UI.
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             const t = BigInt(block.time ?? block.medianTime ?? 0);
             if (t > 0n) blockTimeMs = t;
         }
@@ -299,15 +328,11 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
     for (const [id, auction] of auctions) {
         if (!auction.isSettled || clearings.has(id)) continue;
         try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-            const raw = await contract.getClearingOrder(BigInt(id));
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            const raw = await contract.getClearingOrder(BigInt(id)) as unknown as ClearingResult;
             const r = raw?.properties;
             if (r) {
                 clearings.set(id, {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                     clearingBuyAmount: String(r.clearingBuyAmount ?? '0'),
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
                     clearingSellAmount: String(r.clearingSellAmount ?? '0'),
                 });
             }
@@ -357,15 +382,14 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
             if (settleAttempted.has(id)) continue;
             settleAttempted.add(id);
             try {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                 const sim = await contract.simulateSettle(BigInt(id));
                 if ('error' in (sim as object)) {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                    console.warn(`Auto-settle auction ${id} simulation error:`, sim.error);
+                    const errSim = sim as { error: string };
+                    console.warn(`Auto-settle auction ${id} simulation error:`, errSim.error);
                     continue;
                 }
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-                await sim.sendTransaction(_txParams);
+                const sendable = sim as { sendTransaction(params: TransactionParameters): Promise<unknown> };
+                await sendable.sendTransaction(_txParams);
                 console.log(`Auto-settled auction ${id}`);
             } catch (err) {
                 console.warn(`Auto-settle auction ${id} failed:`, err);
@@ -482,35 +506,26 @@ export async function getOrdersData(
     if (cached) return cached;
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const raw = await contract.getAuctionOrders(BigInt(auctionId));
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+        const raw = await contract.getAuctionOrders(BigInt(auctionId)) as unknown as OrdersResult;
         const reader = raw?.result;
         if (!reader) return null;
 
         // The SDK decodes ABI outputs and advances the reader offset.
         // Reset to 0 so we can read the full binary response from the start.
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         if (typeof reader.setOffset === 'function') reader.setOffset(0);
 
         // First u256 = orderCount
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-        const orderCount = Number(reader.readU256() as bigint);
+        const orderCount = Number(reader.readU256());
 
         const orders: IndexedOrder[] = [];
         const userAddressCache = new Map<string, string>();
 
         for (let i = 0; i < orderCount; i++) {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const buyAmount = String(reader.readU256() as bigint);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const sellAmount = String(reader.readU256() as bigint);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const userId = String(reader.readU256() as bigint);
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const cancelled = reader.readBoolean() as boolean;
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-            const claimed = reader.readBoolean() as boolean;
+            const buyAmount = String(reader.readU256());
+            const sellAmount = String(reader.readU256());
+            const userId = String(reader.readU256());
+            const cancelled = reader.readBoolean();
+            const claimed = reader.readBoolean();
 
             // Resolve userId → address (cache to avoid repeated RPC calls)
             let userAddress = userAddressCache.get(userId);
@@ -543,15 +558,11 @@ export async function getClearingData(
     if (cached) return cached;
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const raw = await contract.getClearingOrder(BigInt(auctionId));
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        const raw = await contract.getClearingOrder(BigInt(auctionId)) as unknown as ClearingResult;
         const r = raw?.properties;
         if (!r) return null;
         const data: IndexedClearing = {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             clearingBuyAmount: String(r.clearingBuyAmount ?? '0'),
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             clearingSellAmount: String(r.clearingSellAmount ?? '0'),
         };
         cache.set(cacheKey, data);

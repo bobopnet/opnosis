@@ -23,7 +23,18 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "@vitejs/plugin-react": "^5.1.4",
+        "crypto-browserify": "latest",
+        "stream-browserify": "latest",
+        "eslint": "^10.0.0",
+        "@eslint/js": "^10.0.1",
+        "typescript-eslint": "^8.56.0",
+        "eslint-plugin-react-hooks": "latest",
+        "eslint-plugin-react-refresh": "latest",
         "typescript": "^5.9.3",
-        "vite": "^7.3.1"
+        "vite": "^7.3.1",
+        "vite-plugin-node-polyfills": "latest"
+    },
+    "overrides": {
+        "@noble/hashes": "2.0.1"
     }
 }

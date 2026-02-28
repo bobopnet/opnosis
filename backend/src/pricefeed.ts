@@ -133,15 +133,16 @@ const TOKEN_MOTO_CACHE_TTL_MS = 30_000; // 30s cache
 
 const decCache = new Map<string, number>();
 
+interface OP20DecimalsContract {
+    decimals(): Promise<{ properties: { decimals?: number; [key: string]: unknown } }>;
+}
+
 async function resolveDecimals(address: string): Promise<number> {
     if (decCache.has(address)) return decCache.get(address)!;
     try {
         const networkConfig = getNetworkConfig(config.network);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const token = getContract(address, OP_20_ABI, provider, networkConfig.btcNetwork) as any;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+        const token = getContract(address, OP_20_ABI, provider, networkConfig.btcNetwork) as unknown as OP20DecimalsContract;
         const result = await token.decimals();
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const dec = Number(result?.properties?.decimals ?? 18);
         decCache.set(address, dec);
         return dec;
