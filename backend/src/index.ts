@@ -16,7 +16,7 @@ import HyperExpress from '@btc-vision/hyper-express';
 import { OpnosisContract } from '@opnosis/shared';
 import { config, provider, networkConfig, wallet, txParams } from './config.js';
 import { Cache } from './cache.js';
-import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats, getTokenInfo, getBlockTime } from './indexer.js';
+import { startIndexer, getAuctions, getAuction, getClearingData, getOrdersData, getStats, getTokenInfo, getBlockTime, getBlockHeight } from './indexer.js';
 import { getTokenUsdPrice } from './pricefeed.js';
 
 const contract = new OpnosisContract(
@@ -63,11 +63,13 @@ app.use((req, res, next) => {
 
 // -- GET /health ---------------------------------------------------------------
 
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
+    const blockHeight = await getBlockHeight();
     res.json({
         status: 'ok',
         network: config.network,
         contract: config.contractAddress,
+        blockHeight,
     });
 });
 

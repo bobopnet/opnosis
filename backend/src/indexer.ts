@@ -481,6 +481,13 @@ export function getAuction(id: number): IndexedAuction | undefined {
 }
 
 /** Return the latest blockchain timestamp in milliseconds. */
+export async function getBlockHeight(): Promise<number> {
+    try {
+        if (_provider) return Number(await _provider.getBlockNumber());
+    } catch { /* fall back */ }
+    return 0;
+}
+
 export async function getBlockTime(): Promise<string> {
     try {
         if (_provider) {
@@ -508,28 +515,27 @@ export async function getStats(): Promise<AuctionStats> {
         totalOrdersPlaced += Number(auction.orderCount);
         if (auction.status === 'settled') {
             settledAuctions++;
-            // Use clearing data to compute actual raised (clearing price × tokens sold)
-            // totalBidAmount includes excess that gets refunded to bidders
+            // Use clearing data to compute actual raised (clearing price × tokens sold).
+            // Cap at totalBidAmount: when CLEARING_NONE and total bids < reserve,
+            // the formula overestimates (returns reserve instead of actual bids).
+            const totalBid = BigInt(auction.totalBidAmount || '0');
             const clearing = clearings.get(id);
             if (clearing) {
                 const sellAmt = BigInt(auction.auctionedSellAmount);
                 const clearBuy = BigInt(clearing.clearingBuyAmount);
                 const clearSell = BigInt(clearing.clearingSellAmount);
-                // raised = auctionedSellAmount * (clearingSellAmount / clearingBuyAmount)
-                const raisedTokens = sellAmt * clearSell / clearBuy;
+                const fromClearing = sellAmt * clearSell / clearBuy;
+                const raisedTokens = totalBid < fromClearing ? totalBid : fromClearing;
                 priceTasks.push({
                     raised: Number(raisedTokens) / (10 ** auction.biddingTokenDecimals),
                     tokenAddress: auction.biddingToken,
                 });
-            } else {
+            } else if (totalBid > 0n) {
                 // Fallback to totalBidAmount if clearing not available
-                const totalBid = BigInt(auction.totalBidAmount || '0');
-                if (totalBid > 0n) {
-                    priceTasks.push({
-                        raised: Number(totalBid) / (10 ** auction.biddingTokenDecimals),
-                        tokenAddress: auction.biddingToken,
-                    });
-                }
+                priceTasks.push({
+                    raised: Number(totalBid) / (10 ** auction.biddingTokenDecimals),
+                    tokenAddress: auction.biddingToken,
+                });
             }
         } else if (auction.status === 'upcoming') {
             upcomingAuctions++;

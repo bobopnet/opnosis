@@ -126,9 +126,9 @@ const fieldTable = (
             <tr><td style={s.tdField}>Auctioning Token</td><td style={s.td}>The OP-20 token you are selling.</td></tr>
             <tr><td style={s.tdField}>Bidding Token</td><td style={s.td}>The OP-20 token bidders use to place bids.</td></tr>
             <tr><td style={s.tdField}>Sell Amount</td><td style={s.td}>Total tokens you are putting up for auction.</td></tr>
-            <tr><td style={s.tdField}>Min Buy Amount</td><td style={s.td}>Minimum total bids you will accept. Sets the reserve price. This value is private — bidders cannot see it. Bids below the reserve are rejected with a generic error that does not reveal the reserve price.</td></tr>
+            <tr><td style={s.tdField}>Min Buy Amount</td><td style={s.td}>Minimum total bids you will accept. Sets the reserve price. Bids below the reserve are accepted on-chain but will be treated as losing bids during settlement and automatically refunded.</td></tr>
             <tr><td style={s.tdField}>Min Bid Per Order</td><td style={s.td}>Smallest individual bid allowed. Prevents dust bids.</td></tr>
-            <tr><td style={s.tdField}>Min Funding Threshold</td><td style={s.td}>Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. 0 = disabled.</td></tr>
+            <tr><td style={s.tdField}>Min Funding Threshold</td><td style={s.td}>Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. Only bids at or above the reserve price count toward meeting this threshold — below-reserve bids are excluded. 0 = disabled.</td></tr>
             <tr><td style={s.tdField}>Cancel Window</td><td style={s.td}>Minutes during which bidders can cancel. After this, bids are final.</td></tr>
             <tr><td style={s.tdField}>Auction Duration</td><td style={s.td}>Minutes the auction accepts bids before settlement.</td></tr>
             <tr><td style={s.tdField}>Atomic Closure</td><td style={s.td}>When enabled, the auctioneer can settle the auction early once the min funding threshold is met. When disabled, the auction always runs for the full duration.</td></tr>
@@ -213,6 +213,8 @@ const sections: Section[] = [
                 a: <>
                     The auction is marked as <strong>Failed</strong> and <strong>no protocol fee is charged</strong>. The auctioneer&apos;s full deposit (sell tokens + fee deposit) is returned in full. All bidding tokens are automatically refunded to bidders.
                     <br /><br />
+                    Only bids at or above the reserve price count toward meeting the minimum funding threshold. Bids below the reserve are excluded from the funding calculation and are refunded after settlement.
+                    <br /><br />
                     Your bids will show as <strong>&ldquo;Cancelled&rdquo;</strong> in the <strong>My Bids</strong> tab because the auction did not reach the minimum funding required. This is not a manual cancellation &mdash; it happens automatically when the auction ends without enough total bids.
                     <br /><br />
                     Settlement and refund distribution are fully automatic &mdash; the backend handles both transactions shortly after the auction ends. No manual action is needed from bidders or the auctioneer.
@@ -276,6 +278,17 @@ const sections: Section[] = [
                 a: 'Yes, but only during the cancel window set by the auctioneer. Once the cancel window closes, all bids are final and cannot be withdrawn.',
             },
             {
+                id: 'grace-period',
+                q: 'What happens if I place a bid right before the auction ends?',
+                a: <>
+                    Opnosis Auction includes a <strong>10-minute grace period</strong> after the auction end time. If you submit your bid before the deadline but the Bitcoin block confirming your transaction is mined after the auction ends, your bid will still be accepted as long as it confirms within the grace window.
+                    <br /><br />
+                    The bid form is disabled as soon as the auction end time passes, so no new bids can be submitted during the grace period &mdash; it only protects bids that were already broadcast to the network before the deadline.
+                    <br /><br />
+                    Settlement does not begin until the grace period expires, ensuring all eligible bids are included in the final clearing price calculation.
+                </>,
+            },
+            {
                 id: 'clearing-price',
                 q: 'How is the clearing price determined?',
                 a: <>
@@ -321,9 +334,9 @@ const sections: Section[] = [
                 id: 'auto-settlement',
                 q: 'How does automatic settlement and token distribution work?',
                 a: <>
-                    Once an auction ends, the Opnosis backend automatically handles everything &mdash; no action required from the auctioneer or bidders.
+                    Once an auction ends, a <strong>10-minute grace period</strong> allows any bids that were submitted before the deadline but not yet confirmed on-chain to be included. After the grace period, the Opnosis backend automatically handles everything &mdash; no action required from the auctioneer or bidders.
                     <br /><br />
-                    <strong>Step 1 &mdash; Settlement:</strong> The backend detects when an auction has ended and submits a settlement transaction that computes the clearing price on-chain.
+                    <strong>Step 1 &mdash; Settlement:</strong> After the grace period, the backend detects when an auction has ended and submits a settlement transaction that computes the clearing price on-chain.
                     <br /><br />
                     <strong>Step 2 &mdash; Distribution:</strong> Immediately after settlement, the backend submits a single batch transaction that distributes tokens to every participant:
                     <br /><br />

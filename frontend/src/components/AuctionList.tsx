@@ -187,7 +187,7 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
     const [expandedOrders, setExpandedOrders] = useState<IndexedOrder[]>([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
 
-    const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress, addPendingBid } = opnosis;
+    const { txState, resetTx, placeOrders, settleAuction, claimOrders, extendAuction, approveToken, hexAddress, addPendingBid, pendingBids } = opnosis;
     const busy = txState.status === 'pending';
 
     /* Reset form state when expanded card changes */
@@ -400,7 +400,6 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                     parseTokenAmount(bidSellAmount, auction.biddingTokenDecimals).toString(),
                     parseTokenAmount(minBuy, auction.auctioningTokenDecimals).toString(),
                     snapshot,
-                    result === 'phantom',
                 );
                 setBidSellAmount('');
                 setBidMaxUsd('');
@@ -521,37 +520,80 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
             </div>
 
             {/* Cancel window — only show when a cancel window was configured */}
-            {a.hasCancelWindow && !a.isSettled && (
-                <div style={{ marginBottom: '8px' }}>
-                    <div style={s.metaLabel}>Cancel Window Ends</div>
-                    <div style={s.metaValue}>{formatTimestamp(BigInt(a.cancellationEndDate))}</div>
-                </div>
-            )}
+            {a.hasCancelWindow && !a.isSettled && (() => {
+                const cancelEnded = BigInt(Date.now()) >= BigInt(a.cancellationEndDate);
+                return (
+                    <div style={{ marginBottom: '8px' }}>
+                        <div style={s.metaLabel}>{cancelEnded ? 'Cancel Window Has Ended' : 'Cancel Window Ends'}</div>
+                        <div style={s.metaValue}>{formatTimestamp(BigInt(a.cancellationEndDate))}</div>
+                    </div>
+                );
+            })()}
 
             {/* Current Bids — auctioneer only */}
-            {Number(a.orderCount) > 0 && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
+            {(() => {
+                const isAuctioneer = connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase();
+                if (!isAuctioneer) return null;
+                // Pending bids for this auction (not yet matched on-chain)
+                const auctionPending = pendingBids.filter((pb) =>
+                    pb.auctionId === a.id
+                    && !expandedOrders.some((o) => o.sellAmount === pb.sellAmount && o.userAddress.replace(/^0x/i, '').toLowerCase() === pb.address.replace(/^0x/i, '').toLowerCase()),
+                );
+                if (Number(a.orderCount) === 0 && auctionPending.length === 0) return null;
+                const activeOrders = expandedOrders.filter((o) => !o.cancelled);
+                const auctionedSell = BigInt(a.auctionedSellAmount || '0');
+                const minBuy = BigInt(a.minBuyAmount || '0');
+                const meetsReserve = (o: IndexedOrder): boolean => {
+                    if (minBuy === 0n || auctionedSell === 0n) return true;
+                    return BigInt(o.sellAmount) * auctionedSell >= minBuy * BigInt(o.buyAmount);
+                };
+                const aboveReserve = activeOrders.filter(meetsReserve);
+                const belowReserve = activeOrders.filter((o) => !meetsReserve(o));
+                const thStyle = { padding: '8px 12px', fontWeight: 600, textAlign: 'left' as const, color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' };
+                const tdStyle = { padding: '10px 12px' };
+                return (
                 <div style={s.section} onClick={(e) => e.stopPropagation()}>
-                    <div style={sectionTitleStyle}>Current Bids ({expandedOrders.filter((o) => !o.cancelled).length})</div>
-                    {ordersLoading && expandedOrders.length === 0 ? (
+                    <div style={sectionTitleStyle}>Current Bids ({aboveReserve.length + auctionPending.length}{belowReserve.length > 0 ? ` + ${belowReserve.length} below reserve` : ''})</div>
+                    {ordersLoading && expandedOrders.length === 0 && auctionPending.length === 0 ? (
                         <div style={{ color: color.textSecondary, fontFamily: font.body, fontSize: '13px' }}>Loading bids...</div>
                     ) : (
                         <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font.body, fontSize: '13px' }}>
                                 <thead>
                                     <tr style={{ borderBottom: `1px solid ${color.borderStrong}` }}>
-                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>#</th>
-                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bid Amount</th>
-                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Min Receive</th>
-                                        <th style={{ padding: '8px 12px', fontWeight: 600, textAlign: 'left', color: color.textSecondary, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Address</th>
+                                        <th style={thStyle}>#</th>
+                                        <th style={thStyle}>Bid Amount</th>
+                                        <th style={thStyle}>Min Receive</th>
+                                        <th style={thStyle}>Address</th>
+                                        <th style={thStyle}>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {expandedOrders.filter((o) => !o.cancelled).map((o) => (
+                                    {auctionPending.map((pb, idx) => (
+                                        <tr key={`pending-${idx}`} style={{ borderBottom: `1px solid ${color.borderSubtle}` }}>
+                                            <td style={{ ...tdStyle, color: color.textSecondary }}>--</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(pb.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(pb.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textSecondary, fontFamily: 'monospace', fontSize: '12px' }}>{pb.address.slice(0, 10)}...{pb.address.slice(-6)}</td>
+                                            <td style={tdStyle}><span style={badgeStyle('pending')}>Pending</span></td>
+                                        </tr>
+                                    ))}
+                                    {aboveReserve.map((o) => (
                                         <tr key={o.orderId} style={{ borderBottom: `1px solid ${color.borderSubtle}` }}>
-                                            <td style={{ padding: '10px 12px', color: color.textSecondary }}>{o.orderId}</td>
-                                            <td style={{ padding: '10px 12px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
-                                            <td style={{ padding: '10px 12px', color: color.textPrimary }}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
-                                            <td style={{ padding: '10px 12px', color: color.textSecondary, fontFamily: 'monospace', fontSize: '12px' }}>{o.userAddress.slice(0, 10)}...{o.userAddress.slice(-6)}</td>
+                                            <td style={{ ...tdStyle, color: color.textSecondary }}>{o.orderId}</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textSecondary, fontFamily: 'monospace', fontSize: '12px' }}>{o.userAddress.slice(0, 10)}...{o.userAddress.slice(-6)}</td>
+                                            <td style={tdStyle}><span style={badgeStyle('amber')}>Active</span></td>
+                                        </tr>
+                                    ))}
+                                    {belowReserve.map((o) => (
+                                        <tr key={o.orderId} style={{ borderBottom: `1px solid ${color.borderSubtle}`, opacity: 0.5 }}>
+                                            <td style={{ ...tdStyle, color: color.textSecondary }}>{o.orderId}</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textPrimary }}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                            <td style={{ ...tdStyle, color: color.textSecondary, fontFamily: 'monospace', fontSize: '12px' }}>{o.userAddress.slice(0, 10)}...{o.userAddress.slice(-6)}</td>
+                                            <td style={tdStyle}><span style={badgeStyle('muted')}>Below Reserve</span></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -559,7 +601,8 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                         </div>
                     )}
                 </div>
-            )}
+                );
+            })()}
 
             {/* Extend Auction (auctioneer only, non-settled) */}
             {!a.isSettled && !settledIds.has(a.id) && connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase() && (
@@ -794,7 +837,7 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                 ) : (
                     <>
                         <div style={s.label}>Total Bid Amount</div>
-                        <div style={s.value}>{formatTokenAmount(BigInt(a.totalBidAmount || '0'), a.biddingTokenDecimals)} {a.biddingTokenSymbol}</div>
+                        <div style={s.value}>{formatTokenAmount(totalBid, a.biddingTokenDecimals)} {a.biddingTokenSymbol}</div>
                     </>
                 )}
 

@@ -125,6 +125,17 @@ const FEE_DENOMINATOR: u256 = u256.fromU32(1000);
 const MAX_FEE_NUMERATOR: u256 = u256.fromU32(15);
 
 /**
+ * Grace period (in seconds) after auctionEndDate during which unconfirmed bids
+ * are still accepted on-chain. This covers bids broadcast before the end time
+ * but mined in a later block. The frontend disables the bid form at auctionEndDate
+ * so no NEW bids can be submitted during the grace window.
+ * Settlement is also blocked until the grace period expires.
+ *
+ * 600 seconds = 10 minutes (roughly 1 Bitcoin block).
+ */
+const BID_GRACE_PERIOD: u256 = u256.fromU32(600);
+
+/**
  * Sentinel value for clearingOrderId meaning "no bidder order found as clearing
  * price — the initial auction order (auctioneer's minimum price) is the clearing price."
  */
@@ -395,7 +406,13 @@ export class Opnosis extends OP_NET {
 
     // ── Phase guards ─────────────────────────────────────────────────────────
 
-    /** Revert if auction is not in the order-placement phase (before auctionEndDate, after startDate). */
+    /**
+     * Revert if auction is not in the order-placement phase.
+     * Bids are accepted before auctionEndDate + BID_GRACE_PERIOD to allow
+     * unconfirmed transactions broadcast before the deadline to land on-chain.
+     * The frontend disables the bid form at auctionEndDate so no new bids
+     * can be submitted during the grace window.
+     */
     private requireOrderPlacement(auctionId: u256): void {
         if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
             throw new Revert('Opnosis: auction does not exist');
@@ -405,7 +422,9 @@ export class Opnosis extends OP_NET {
         if (!u256.eq(startDate, u256.Zero) && now < startDate) {
             throw new Revert('Opnosis: order placement has not started');
         }
-        if (now >= this.mapAuctionEnd.get(auctionId)) {
+        const endDate = this.mapAuctionEnd.get(auctionId);
+        const graceDeadline = SafeMath.add(endDate, BID_GRACE_PERIOD);
+        if (now >= graceDeadline) {
             throw new Revert('Opnosis: auction has ended');
         }
         if (!u256.eq(this.mapSettled.get(auctionId), u256.Zero)) {
@@ -418,6 +437,12 @@ export class Opnosis extends OP_NET {
      * If atomic closure is enabled, the auctioneer may settle before the end date
      * (min funding threshold is enforced separately in settleAuction).
      */
+    /**
+     * Revert if auction is not in the solution-submission phase.
+     * Settlement is blocked until auctionEndDate + BID_GRACE_PERIOD so that
+     * late-confirming bids are included before the clearing price is computed.
+     * Exception: atomic closure by the auctioneer can still settle early.
+     */
     private requireSolutionSubmission(auctionId: u256): void {
         if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
             throw new Revert('Opnosis: auction does not exist');
@@ -426,9 +451,11 @@ export class Opnosis extends OP_NET {
             throw new Revert('Opnosis: auction already settled');
         }
         const now = u256.fromU64(Blockchain.block.medianTimestamp);
-        if (now < this.mapAuctionEnd.get(auctionId)) {
-            // Auction has not ended yet — allow early settlement only if atomic closure
-            // is enabled AND the caller is the auctioneer.
+        const endDate = this.mapAuctionEnd.get(auctionId);
+        const graceDeadline = SafeMath.add(endDate, BID_GRACE_PERIOD);
+        if (now < graceDeadline) {
+            // Still within auction + grace period — allow early settlement only
+            // if atomic closure is enabled AND the caller is the auctioneer.
             const atomicAllowed = !u256.eq(this.mapIsAtomic.get(auctionId), u256.Zero);
             if (!atomicAllowed) {
                 throw new Revert('Opnosis: auction has not ended yet');
@@ -1001,9 +1028,9 @@ export class Opnosis extends OP_NET {
             if (sellAmt < minBidPerOrder) {
                 throw new Revert('Opnosis: below minimumBiddingAmountPerOrder');
             }
-            if (!meetsMinPrice(sellAmt, buyAmt, minBuyAmountBidding, auctionedSellAmount)) {
-                throw new Revert('Opnosis: order price below auction minimum');
-            }
+            // Below-reserve bids are accepted on-chain (visible on block explorer).
+            // They are naturally priced below the clearing point and will be
+            // refunded after settlement like any other losing bid.
 
             // Assign orderId = current order count (0-indexed).
             const orderId = orderCount;

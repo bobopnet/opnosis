@@ -66,10 +66,9 @@ interface BidRow {
     order: IndexedOrder;
 }
 
-type DisplayRow = BidRow & { isPending?: boolean; isPhantom?: boolean };
+type DisplayRow = BidRow & { isPending?: boolean };
 
 const PENDING_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-
 interface Props {
     readonly connected: boolean;
     readonly opnosis: ReturnType<typeof useOpnosis>;
@@ -82,6 +81,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [auctions, setAuctions] = useState<IndexedAuction[]>([]);
     const [clearings, setClearings] = useState<Map<string, IndexedClearing>>(new Map());
     const [loading, setLoading] = useState(true);
+    const [usdPrices, setUsdPrices] = useState<Map<string, number>>(new Map());
     const [fetchKey, setFetchKey] = useState(0);
     const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
     const addBusy = useCallback((k: string) => setBusyKeys((s) => new Set(s).add(k)), []);
@@ -163,12 +163,26 @@ export function MyBids({ connected, opnosis }: Props) {
                     } catch { /* clearing unavailable */ }
                 }));
 
+                // Fetch USD prices for bidding tokens used in the user's bids
+                const biddingTokens = [...new Set(allRows.map((r) => r.auction.biddingToken))];
+                const priceMap = new Map<string, number>();
+                await Promise.all(biddingTokens.map(async (token) => {
+                    try {
+                        const pRes = await fetch(`${API_BASE_URL}/price/${token}`);
+                        if (pRes.ok) {
+                            const data = await pRes.json() as { usd: number };
+                            if (data.usd > 0) priceMap.set(token, data.usd);
+                        }
+                    } catch { /* price unavailable */ }
+                }));
+
                 // Most recent bids first (highest auction ID, then highest order ID)
                 allRows.sort((a, b) => Number(b.auction.id) - Number(a.auction.id) || b.order.orderId - a.order.orderId);
                 if (!cancelled) {
                     setRows(allRows);
                     setAuctions(auctions);
                     setClearings(clearingMap);
+                    setUsdPrices(priceMap);
                 }
             } catch {
                 if (!cancelled) setRows([]);
@@ -272,8 +286,6 @@ export function MyBids({ connected, opnosis }: Props) {
     useEffect(() => {
         const now = Date.now();
         for (const pb of pendingBids) {
-            // Phantom bids persist until auction settles — never expire or match
-            if (pb.phantom) continue;
             if (now - pb.timestamp > PENDING_EXPIRY_MS) {
                 removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
                 continue;
@@ -295,15 +307,12 @@ export function MyBids({ connected, opnosis }: Props) {
 
         // Add unmatched, non-expired pending bids for the current wallet only
         for (const pb of pendingBids) {
-            if (!pb.phantom && now - pb.timestamp > PENDING_EXPIRY_MS) continue;
+            if (now - pb.timestamp > PENDING_EXPIRY_MS) continue;
             if (pb.address.toLowerCase() !== hexAddress.toLowerCase()) continue;
-            // Real pending bids: skip if matched on-chain
-            if (!pb.phantom) {
-                const matched = rows.some(
-                    (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
-                );
-                if (matched) continue;
-            }
+            const matched = rows.some(
+                (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
+            );
+            if (matched) continue;
 
             const auction = auctions.find((a) => a.id === pb.auctionId);
             // Build auction metadata from fetched data or pending bid snapshot
@@ -344,8 +353,7 @@ export function MyBids({ connected, opnosis }: Props) {
                     cancelled: false,
                     claimed: false,
                 },
-                isPending: !pb.phantom,
-                isPhantom: pb.phantom,
+                isPending: true,
             });
         }
 
@@ -404,7 +412,9 @@ export function MyBids({ connected, opnosis }: Props) {
                             <th style={s.th}>Auction</th>
                             <th style={s.th}>Bid Amount</th>
                             <th style={s.th}>Min Receive</th>
+                            <th style={s.th}>Max USD/Token</th>
                             <th style={s.th}>Received</th>
+                            <th style={s.th}>Paid USD/Token</th>
                             <th style={s.th}>Status</th>
                             <th style={s.th}>Action</th>
                         </tr>
@@ -413,8 +423,17 @@ export function MyBids({ connected, opnosis }: Props) {
                         {displayRows.map((r, idx) => {
                             const { auction: a, order: o } = r;
 
-                            if (r.isPending || r.isPhantom) {
-                                const phantomSettled = r.isPhantom && a.isSettled;
+                            if (r.isPending) {
+                                const pUsd = usdPrices.get(a.biddingToken);
+                                const pendingMaxUsd = (() => {
+                                    if (!pUsd) return '--';
+                                    const sell = BigInt(o.sellAmount);
+                                    const buy = BigInt(o.buyAmount);
+                                    if (buy === 0n) return '--';
+                                    const sellF = Number(sell) / 10 ** a.biddingTokenDecimals;
+                                    const buyF = Number(buy) / 10 ** a.auctioningTokenDecimals;
+                                    return `$${(sellF / buyF * pUsd).toFixed(4)}`;
+                                })();
                                 return (
                                     <tr key={`pending-${idx}`} style={s.row}>
                                         <td style={s.td}>
@@ -422,11 +441,11 @@ export function MyBids({ connected, opnosis }: Props) {
                                         </td>
                                         <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
                                         <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                        <td style={s.td}>{pendingMaxUsd}</td>
+                                        <td style={s.td}>--</td>
                                         <td style={s.td}>--</td>
                                         <td style={s.td}>
-                                            <span style={badgeStyle(phantomSettled ? 'muted' : r.isPhantom ? 'amber' : 'pending')}>
-                                                {phantomSettled ? 'Below Reserve' : r.isPhantom ? 'Active' : 'Pending'}
-                                            </span>
+                                            <span style={badgeStyle('pending')}>Pending</span>
                                         </td>
                                         <td style={s.td}></td>
                                     </tr>
@@ -461,6 +480,30 @@ export function MyBids({ connected, opnosis }: Props) {
                             else if (isFailed) { statusText = 'Failed'; statusVariant = 'muted'; }
                             else if (canClaim && !backendDown) { statusText = 'Distributing...'; statusVariant = 'pending'; }
 
+                            const bUsd = usdPrices.get(a.biddingToken);
+                            // Max USD/Token = (sellAmount / buyAmount) * biddingTokenUsdPrice
+                            const maxUsdPerToken = (() => {
+                                if (!bUsd) return '--';
+                                const sell = BigInt(o.sellAmount);
+                                const buy = BigInt(o.buyAmount);
+                                if (buy === 0n) return '--';
+                                const sellF = Number(sell) / 10 ** a.biddingTokenDecimals;
+                                const buyF = Number(buy) / 10 ** a.auctioningTokenDecimals;
+                                return `$${(sellF / buyF * bUsd).toFixed(4)}`;
+                            })();
+                            // Paid USD/Token = (clearingSellAmount / clearingBuyAmount) * biddingTokenUsdPrice
+                            const paidUsdPerToken = (() => {
+                                if (!bUsd || isCancelled || isFailed) return '--';
+                                const cl = clearings.get(a.id);
+                                if (!cl || !a.isSettled) return '--';
+                                const clSell = BigInt(cl.clearingSellAmount);
+                                const clBuy = BigInt(cl.clearingBuyAmount);
+                                if (clBuy === 0n) return '--';
+                                const clSellF = Number(clSell) / 10 ** a.biddingTokenDecimals;
+                                const clBuyF = Number(clBuy) / 10 ** a.auctioningTokenDecimals;
+                                return `$${(clSellF / clBuyF * bUsd).toFixed(4)}`;
+                            })();
+
                             return (
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
                                     <td style={s.td}>
@@ -468,6 +511,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                     </td>
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount), a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}</td>
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount), a.auctioningTokenDecimals).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                    <td style={s.td}>{maxUsdPerToken}</td>
                                     <td style={s.td}>{(() => {
                                         if (isCancelled || isFailed) return '--';
                                         const cl = clearings.get(a.id);
@@ -479,6 +523,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                         const received = sell * clearBuy / clearSell;
                                         return `${formatTokenAmount(received, a.auctioningTokenDecimals).split('.')[0]} ${a.auctioningTokenSymbol}`;
                                     })()}</td>
+                                    <td style={s.td}>{paidUsdPerToken}</td>
                                     <td style={s.td}><span style={badgeStyle(statusVariant)}>{statusText}</span></td>
                                     <td style={s.td}>
                                         {canCancel && (

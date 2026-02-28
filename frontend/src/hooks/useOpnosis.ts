@@ -23,7 +23,6 @@ export interface PendingBid {
     readonly buyAmount: string;      // base units (after parseTokenAmount)
     readonly address: string;        // hex address of the wallet that placed it
     readonly timestamp: number;      // Date.now() when placed
-    readonly phantom?: boolean;      // silently rejected (e.g. below reserve) — persists until settlement
     readonly auctionSnapshot?: {     // auction metadata for immediate rendering
         readonly auctioningTokenSymbol: string;
         readonly biddingTokenSymbol: string;
@@ -39,7 +38,7 @@ interface UseOpnosisReturn {
     readonly completedKeys: Map<string, 'claimed' | 'cancelled'>;
     readonly markCompleted: (key: string, action: 'claimed' | 'cancelled') => void;
     readonly pendingBids: readonly PendingBid[];
-    readonly addPendingBid: (auctionId: string, sellAmount: string, buyAmount: string, auctionSnapshot?: PendingBid['auctionSnapshot'], phantom?: boolean) => void;
+    readonly addPendingBid: (auctionId: string, sellAmount: string, buyAmount: string, auctionSnapshot?: PendingBid['auctionSnapshot']) => void;
     readonly removePendingBid: (auctionId: string, sellAmount: string, buyAmount: string) => void;
     readonly createAuction: (params: {
         auctioningToken: string;
@@ -53,7 +52,7 @@ interface UseOpnosisReturn {
         minFundingThreshold: bigint;
         isAtomicClosureAllowed: boolean;
     }) => Promise<boolean>;
-    readonly placeOrders: (auctionId: bigint, minBuyAmounts: bigint[], sellAmounts: bigint[]) => Promise<boolean | 'phantom'>;
+    readonly placeOrders: (auctionId: bigint, minBuyAmounts: bigint[], sellAmounts: bigint[]) => Promise<boolean>;
     readonly cancelOrders: (auctionId: bigint, orderIds: bigint[]) => Promise<boolean>;
     readonly settleAuction: (auctionId: bigint) => Promise<boolean>;
     readonly claimOrders: (auctionId: bigint, orderIds: bigint[]) => Promise<boolean>;
@@ -76,8 +75,10 @@ export function useOpnosis(
     const hexAddress = address?.toString() ?? '';
 
     const [pendingBids, setPendingBids] = useState<PendingBid[]>([]);
-    const addPendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string, auctionSnapshot?: PendingBid['auctionSnapshot'], phantom?: boolean) => {
-        setPendingBids((prev) => [...prev, { auctionId, sellAmount, buyAmount, address: hexAddress, timestamp: Date.now(), auctionSnapshot, phantom }]);
+    const addPendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string, auctionSnapshot?: PendingBid['auctionSnapshot']) => {
+        const bid: PendingBid = { auctionId, sellAmount, buyAmount, address: hexAddress, timestamp: Date.now() };
+        if (auctionSnapshot) (bid as { auctionSnapshot: typeof auctionSnapshot }).auctionSnapshot = auctionSnapshot;
+        setPendingBids((prev) => [...prev, bid]);
     }, [hexAddress]);
     const removePendingBid = useCallback((auctionId: string, sellAmount: string, buyAmount: string) => {
         setPendingBids((prev) => {
@@ -168,13 +169,7 @@ export function useOpnosis(
             setTxState({ status: 'success', message: 'Order placed!' });
             return true;
         } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Failed';
-            // Silently reject bids below reserve — don't reveal reserve exists
-            if (msg.includes('order price below auction minimum')) {
-                setTxState({ status: 'success', message: 'Order placed!' });
-                return 'phantom';
-            }
-            setTxState({ status: 'error', message: msg });
+            setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });
             return false;
         }
     }, [contract]);

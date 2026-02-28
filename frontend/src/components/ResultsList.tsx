@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount, formatPrice } from '@opnosis/shared';
 import {
     color, font, card, badge as badgeStyle,
     sectionTitle as sectionTitleStyle,
 } from '../styles.js';
-import type { IndexedAuction, IndexedClearing, AuctionStats } from '../types.js';
+import type { IndexedAuction, IndexedClearing } from '../types.js';
 
 const s = {
     empty: {
@@ -81,11 +81,7 @@ interface ResultRow {
     usdPrice: number;
 }
 
-interface Props {
-    readonly stats: AuctionStats | null;
-}
-
-export function ResultsList({ stats }: Props) {
+export function ResultsList() {
     const [rows, setRows] = useState<ResultRow[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -136,6 +132,58 @@ export function ResultsList({ stats }: Props) {
         return () => { cancelled = true; };
     }, []);
 
+    // Pre-compute per-row derived values so the banner total matches row values exactly
+    const computed = useMemo(() => rows.map(({ auction: a, clearing, usdPrice }) => {
+        const minFunding = BigInt(a.minFundingThreshold || '0');
+        const totalBidAmt = BigInt(a.totalBidAmount || '0');
+        const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
+        const currentStatus = (a.status === 'ended' || clientEnded) ? 'ended' : a.status;
+        const isFailed = a.fundingNotReached
+            || (currentStatus === 'ended' && !a.isSettled && minFunding > 0n && totalBidAmt < minFunding);
+
+        // Compute actual raised from clearing data (clearing price × tokens sold).
+        // Cap at totalBidAmount: when CLEARING_NONE and total bids < reserve,
+        // the formula overestimates (returns reserve instead of actual bids).
+        let raisedTokens: bigint;
+        if (isFailed) {
+            raisedTokens = 0n;
+        } else if (clearing) {
+            const sellAmt = BigInt(a.auctionedSellAmount);
+            const clearBuy = BigInt(clearing.clearingBuyAmount);
+            const clearSell = BigInt(clearing.clearingSellAmount);
+            const fromClearing = sellAmt * clearSell / clearBuy;
+            raisedTokens = totalBidAmt < fromClearing ? totalBidAmt : fromClearing;
+        } else {
+            raisedTokens = BigInt(a.totalBidAmount || '0');
+        }
+        const raisedHuman = Number(raisedTokens) / (10 ** a.biddingTokenDecimals);
+        const raisedUsd = !isFailed && usdPrice > 0 && raisedHuman > 0
+            ? raisedHuman * usdPrice
+            : 0;
+        const raisedUsdStr = raisedUsd > 0
+            ? `$${raisedUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : '--';
+
+        let clearingPrice = '--';
+        if (!isFailed && clearing) {
+            const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
+            const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
+            const tokenRatio = buyHuman > 0 ? sellHuman / buyHuman : 0;
+            if (usdPrice > 0 && tokenRatio > 0) {
+                clearingPrice = `$${(tokenRatio * usdPrice).toFixed(2)}`;
+            } else {
+                clearingPrice = formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount), a.biddingTokenDecimals, a.auctioningTokenDecimals) + ` ${a.biddingTokenSymbol}`;
+            }
+        }
+
+        return { a, clearing, minFunding, totalBidAmt, isFailed, raisedTokens, raisedUsd, raisedUsdStr, clearingPrice };
+    }), [rows]);
+
+    const totalRaisedUsd = useMemo(
+        () => computed.reduce((sum, r) => sum + r.raisedUsd, 0),
+        [computed],
+    );
+
     if (loading) return <div style={s.loading}>Loading results...</div>;
     if (rows.length === 0) return (
         <>
@@ -150,9 +198,9 @@ export function ResultsList({ stats }: Props) {
                 <div style={sectionTitleStyle}>Results</div>
             </div>
 
-            {stats && Number(stats.totalRaisedUsd) > 0 && (
+            {totalRaisedUsd > 0 && (
                 <div style={s.totalRaised}>
-                    <div style={s.totalRaisedValue}>${Number(stats.totalRaisedUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style={s.totalRaisedValue}>${totalRaisedUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                     <div style={s.totalRaisedLabel}>Total Raised Across All Auctions</div>
                 </div>
             )}
@@ -172,45 +220,7 @@ export function ResultsList({ stats }: Props) {
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map(({ auction: a, clearing, usdPrice }) => {
-                            const minFunding = BigInt(a.minFundingThreshold || '0');
-                            const totalBidAmt = BigInt(a.totalBidAmount || '0');
-                            const clientEnded = BigInt(Date.now()) >= BigInt(a.auctionEndDate);
-                            const currentStatus = (a.status === 'ended' || clientEnded) ? 'ended' : a.status;
-                            const isFailed = a.fundingNotReached
-                                || (currentStatus === 'ended' && !a.isSettled && minFunding > 0n && totalBidAmt < minFunding);
-
-                            // Compute actual raised from clearing data (clearing price × tokens sold)
-                            // totalBidAmount includes excess refunded to bidders
-                            let raisedTokens: bigint;
-                            if (isFailed) {
-                                raisedTokens = 0n;
-                            } else if (clearing) {
-                                const sellAmt = BigInt(a.auctionedSellAmount);
-                                const clearBuy = BigInt(clearing.clearingBuyAmount);
-                                const clearSell = BigInt(clearing.clearingSellAmount);
-                                raisedTokens = sellAmt * clearSell / clearBuy;
-                            } else {
-                                raisedTokens = BigInt(a.totalBidAmount || '0');
-                            }
-                            const raisedHuman = Number(raisedTokens) / (10 ** a.biddingTokenDecimals);
-                            const usdValue = !isFailed && usdPrice > 0 && raisedHuman > 0
-                                ? `$${(raisedHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                : '--';
-
-                            let clearingPrice = '--';
-                            if (!isFailed && clearing) {
-                                // Human price = (sell / 10^biddingDec) / (buy / 10^auctioningDec)
-                                const sellHuman = Number(BigInt(clearing.clearingSellAmount)) / (10 ** a.biddingTokenDecimals);
-                                const buyHuman = Number(BigInt(clearing.clearingBuyAmount)) / (10 ** a.auctioningTokenDecimals);
-                                const tokenRatio = buyHuman > 0 ? sellHuman / buyHuman : 0;
-                                if (usdPrice > 0 && tokenRatio > 0) {
-                                    clearingPrice = `$${(tokenRatio * usdPrice).toFixed(2)}`;
-                                } else {
-                                    clearingPrice = formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount), a.biddingTokenDecimals, a.auctioningTokenDecimals) + ` ${a.biddingTokenSymbol}`;
-                                }
-                            }
-
+                        {computed.map(({ a, minFunding, totalBidAmt, isFailed, raisedTokens, raisedUsdStr, clearingPrice }) => {
                             const isSettled = a.isSettled;
 
                             return (
@@ -232,7 +242,7 @@ export function ResultsList({ stats }: Props) {
                                     <td style={s.td}>
                                         {isFailed ? '--' : `${formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`}
                                     </td>
-                                    <td style={s.td}>{usdValue}</td>
+                                    <td style={s.td}>{raisedUsdStr}</td>
                                     <td style={s.td}>
                                         <span style={{ color: isSettled && !isFailed ? color.amber : color.textMuted, fontWeight: isSettled && !isFailed ? 600 : 400 }}>
                                             {clearingPrice}

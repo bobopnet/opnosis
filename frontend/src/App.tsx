@@ -405,7 +405,7 @@ export function App() {
                 <div ref={auctionsRef} style={s.content}>
                     {tab === 'browse' && <AuctionList connected={connected} opnosis={opnosis} refreshKey={refreshKey} pendingAuctions={pendingAuctions} onPendingConfirmed={(pa) => setPendingAuctions((prev) => prev.filter((p) => p !== pa))} />}
                     {tab === 'mybids' && <MyBids connected={connected} opnosis={opnosis} />}
-                    {tab === 'results' && <ResultsList stats={stats} />}
+                    {tab === 'results' && <ResultsList />}
                     {tab === 'create' && (
                         <CreateAuction
                             connected={connected}
