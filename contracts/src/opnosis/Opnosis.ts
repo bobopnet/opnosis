@@ -74,6 +74,7 @@ import {
     BytesWriter,
     Calldata,
     EMPTY_POINTER,
+    encodeSelector,
     OP_NET,
     Revert,
     SafeMath,
@@ -215,6 +216,23 @@ function u256ToU32(val: u256): u32 {
 function mulWouldOverflow(a: u256, b: u256): bool {
     if (u256.eq(a, u256.Zero) || u256.eq(b, u256.Zero)) return false;
     return b > SafeMath.div(u256.Max, a);
+}
+
+/** Selector for OP20 balanceOf(address). */
+const BALANCE_OF_SELECTOR = encodeSelector('balanceOf(address)');
+
+/**
+ * Cross-contract call to query balanceOf on an OP20 token.
+ * Returns the token balance of `account` held by `token`.
+ */
+function queryBalanceOf(token: Address, account: Address): u256 {
+    const cd = new BytesWriter(4 + ADDRESS_BYTE_LENGTH);
+    cd.writeSelector(BALANCE_OF_SELECTOR);
+    cd.writeAddress(account);
+
+    const result = Blockchain.call(token, cd, false);
+    if (!result.success) return u256.Zero;
+    return result.data.readU256();
 }
 
 // ─── Contract ────────────────────────────────────────────────────────────────
@@ -826,12 +844,19 @@ export class Opnosis extends OP_NET {
         );
 
         // ── Interactions ─────────────────────────────────────────────────────
+        const balBefore = queryBalanceOf(auctioningToken, Blockchain.contractAddress);
+
         TransferHelper.transferFrom(
             auctioningToken,
             sender,
             Blockchain.contractAddress,
             totalDeposit,
         );
+
+        const balAfter = queryBalanceOf(auctioningToken, Blockchain.contractAddress);
+        if (SafeMath.sub(balAfter, balBefore) < totalDeposit) {
+            throw new Revert('Opnosis: auctioning token transfer failed');
+        }
 
         this.unlock();
 
@@ -1001,12 +1026,19 @@ export class Opnosis extends OP_NET {
         this.mapOrderCount.set(auctionId, orderCount);
 
         // ── Interactions ─────────────────────────────────────────────────────
+        const balBefore = queryBalanceOf(biddingTokenAddr, Blockchain.contractAddress);
+
         TransferHelper.transferFrom(
             biddingTokenAddr,
             sender,
             Blockchain.contractAddress,
             totalBidding,
         );
+
+        const balAfter = queryBalanceOf(biddingTokenAddr, Blockchain.contractAddress);
+        if (SafeMath.sub(balAfter, balBefore) < totalBidding) {
+            throw new Revert('Opnosis: bidding token transfer failed');
+        }
 
         this.unlock();
 
