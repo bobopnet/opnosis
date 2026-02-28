@@ -5,7 +5,7 @@ import {
     color, font, card, btnPrimary, btnSecondary, btnDisabled,
     sectionTitle as sectionTitleStyle, statusMsg, dismissBtn, badge as badgeStyle,
 } from '../styles.js';
-import type { IndexedAuction, IndexedOrder } from '../types.js';
+import type { IndexedAuction, IndexedOrder, IndexedClearing } from '../types.js';
 import type { useOpnosis } from '../hooks/useOpnosis.js';
 
 /* ── Styles ────────────────────────────────────────────────────────── */
@@ -75,6 +75,7 @@ interface Props {
 
 export function MyBids({ connected, opnosis }: Props) {
     const [rows, setRows] = useState<BidRow[]>([]);
+    const [clearings, setClearings] = useState<Map<string, IndexedClearing>>(new Map());
     const [loading, setLoading] = useState(false);
     const [fetchKey, setFetchKey] = useState(0);
     const [busyKey, setBusyKey] = useState<string | null>(null); // which order or 'all'
@@ -118,9 +119,25 @@ export function MyBids({ connected, opnosis }: Props) {
                     }
                 }));
 
+                // Fetch clearing data for settled auctions
+                const settledIds = [...new Set(withOrders.filter((a) => a.isSettled).map((a) => a.id))];
+                const clearingMap = new Map<string, IndexedClearing>();
+                await Promise.all(settledIds.map(async (id) => {
+                    try {
+                        const cRes = await fetch(`${API_BASE_URL}/auctions/${id}/clearing`);
+                        if (cRes.ok) {
+                            const data = await cRes.json() as IndexedClearing;
+                            clearingMap.set(id, data);
+                        }
+                    } catch { /* clearing unavailable */ }
+                }));
+
                 // Most recent bids first (highest auction ID, then highest order ID)
                 allRows.sort((a, b) => Number(b.auction.id) - Number(a.auction.id) || b.order.orderId - a.order.orderId);
-                if (!cancelled) setRows(allRows);
+                if (!cancelled) {
+                    setRows(allRows);
+                    setClearings(clearingMap);
+                }
             } catch {
                 if (!cancelled) setRows([]);
             } finally {
@@ -240,6 +257,7 @@ export function MyBids({ connected, opnosis }: Props) {
                             <th style={s.th}>Auction</th>
                             <th style={s.th}>Bid Amount</th>
                             <th style={s.th}>Min Receive</th>
+                            <th style={s.th}>Received</th>
                             <th style={s.th}>Status</th>
                             <th style={s.th}>Action</th>
                         </tr>
@@ -266,6 +284,17 @@ export function MyBids({ connected, opnosis }: Props) {
                                     </td>
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.sellAmount)).split('.')[0]} {a.biddingTokenSymbol}</td>
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount)).split('.')[0]} {a.auctioningTokenSymbol}</td>
+                                    <td style={s.td}>{(() => {
+                                        if (isCancelled) return '--';
+                                        const cl = clearings.get(a.id);
+                                        if (!cl || !a.isSettled) return '--';
+                                        const sell = BigInt(o.sellAmount);
+                                        const clearBuy = BigInt(cl.clearingBuyAmount);
+                                        const clearSell = BigInt(cl.clearingSellAmount);
+                                        if (clearSell === 0n) return '--';
+                                        const received = sell * clearBuy / clearSell;
+                                        return `${formatTokenAmount(received).split('.')[0]} ${a.auctioningTokenSymbol}`;
+                                    })()}</td>
                                     <td style={s.td}><span style={badgeStyle(statusVariant)}>{statusText}</span></td>
                                     <td style={s.td}>
                                         {canCancel && (
