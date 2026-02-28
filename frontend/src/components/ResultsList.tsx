@@ -1,64 +1,13 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../constants.js';
 import { formatTokenAmount, formatPrice } from '@opnosis/shared';
-import { color, font, card, badge as badgeStyle } from '../styles.js';
+import {
+    color, font, card, badge as badgeStyle,
+    sectionTitle as sectionTitleStyle,
+} from '../styles.js';
 import type { IndexedAuction, IndexedClearing, AuctionStats } from '../types.js';
 
 const s = {
-    grid: {
-        display: 'grid',
-        gap: '16px',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-    } as React.CSSProperties,
-    card: {
-        ...card,
-    } as React.CSSProperties,
-    cardHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '16px',
-    } as React.CSSProperties,
-    cardTitle: {
-        fontFamily: font.display,
-        fontWeight: 700,
-        fontSize: '16px',
-        color: color.textPrimary,
-    } as React.CSSProperties,
-    priceLabel: {
-        color: color.textMuted,
-        fontSize: '11px',
-        fontFamily: font.body,
-        textTransform: 'uppercase' as const,
-        letterSpacing: '0.05em',
-        marginTop: '4px',
-    } as React.CSSProperties,
-    priceValue: {
-        fontFamily: font.display,
-        fontSize: '24px',
-        fontWeight: 700,
-        color: color.amber,
-        lineHeight: 1.2,
-        marginBottom: '12px',
-    } as React.CSSProperties,
-    row: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '6px',
-    } as React.CSSProperties,
-    label: {
-        color: color.textMuted,
-        fontSize: '12px',
-        fontFamily: font.body,
-    } as React.CSSProperties,
-    value: {
-        color: color.textSecondary,
-        fontSize: '14px',
-        fontFamily: font.body,
-        fontWeight: 500,
-        textAlign: 'right' as const,
-    } as React.CSSProperties,
     empty: {
         color: color.textMuted,
         textAlign: 'center' as const,
@@ -71,6 +20,39 @@ const s = {
         textAlign: 'center' as const,
         padding: '48px 24px',
         fontFamily: font.body,
+    } as React.CSSProperties,
+    table: {
+        width: '100%',
+        borderCollapse: 'collapse' as const,
+        fontFamily: font.body,
+        fontSize: '13px',
+    } as React.CSSProperties,
+    th: {
+        padding: '8px 12px',
+        fontWeight: 600,
+        textAlign: 'left' as const,
+        color: color.textSecondary,
+        fontSize: '11px',
+        textTransform: 'uppercase' as const,
+        letterSpacing: '0.05em',
+    } as React.CSSProperties,
+    td: {
+        padding: '10px 12px',
+        color: color.textPrimary,
+    } as React.CSSProperties,
+    row: {
+        borderBottom: `1px solid ${color.borderSubtle}`,
+    } as React.CSSProperties,
+    tableWrap: {
+        ...card,
+        padding: '0',
+        overflow: 'hidden',
+    } as React.CSSProperties,
+    auctionName: {
+        fontFamily: font.display,
+        fontWeight: 600,
+        color: color.textPrimary,
+        fontSize: '13px',
     } as React.CSSProperties,
     totalRaised: {
         textAlign: 'center' as const,
@@ -93,9 +75,10 @@ const s = {
     } as React.CSSProperties,
 };
 
-interface AuctionWithClearing {
+interface ResultRow {
     auction: IndexedAuction;
     clearing: IndexedClearing | null;
+    usdPrice: number;
 }
 
 interface Props {
@@ -103,7 +86,7 @@ interface Props {
 }
 
 export function ResultsList({ stats }: Props) {
-    const [results, setResults] = useState<AuctionWithClearing[]>([]);
+    const [rows, setRows] = useState<ResultRow[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -113,24 +96,34 @@ export function ResultsList({ stats }: Props) {
                 const res = await fetch(`${API_BASE_URL}/auctions`);
                 if (!res.ok) throw new Error('Failed to fetch');
                 const auctions = await res.json() as IndexedAuction[];
-                const settled = auctions.filter((a) => a.isSettled);
+                const finished = auctions.filter((a) => a.isSettled || a.status === 'ended');
 
-                const withClearing: AuctionWithClearing[] = await Promise.all(
-                    settled.map(async (auction) => {
+                const results: ResultRow[] = await Promise.all(
+                    finished.map(async (auction) => {
+                        let clearing: IndexedClearing | null = null;
+                        let usdPrice = 0;
                         try {
-                            const cRes = await fetch(`${API_BASE_URL}/auctions/${auction.id}/clearing`);
-                            if (!cRes.ok) return { auction, clearing: null };
-                            const clearing = await cRes.json() as IndexedClearing;
-                            return { auction, clearing };
-                        } catch {
-                            return { auction, clearing: null };
-                        }
+                            if (auction.isSettled) {
+                                const cRes = await fetch(`${API_BASE_URL}/auctions/${auction.id}/clearing`);
+                                if (cRes.ok) clearing = await cRes.json() as IndexedClearing;
+                            }
+                        } catch { /* clearing unavailable */ }
+                        try {
+                            const pRes = await fetch(`${API_BASE_URL}/price/${auction.biddingToken}`);
+                            if (pRes.ok) {
+                                const data = await pRes.json() as { usd: number };
+                                if (data.usd > 0) usdPrice = data.usd;
+                            }
+                        } catch { /* price unavailable */ }
+                        return { auction, clearing, usdPrice };
                     }),
                 );
 
-                if (!cancelled) setResults(withClearing);
+                // Most recent first
+                results.sort((a, b) => Number(b.auction.id) - Number(a.auction.id));
+                if (!cancelled) setRows(results);
             } catch {
-                if (!cancelled) setResults([]);
+                if (!cancelled) setRows([]);
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -140,48 +133,85 @@ export function ResultsList({ stats }: Props) {
     }, []);
 
     if (loading) return <div style={s.loading}>Loading results...</div>;
-    if (results.length === 0) return <div style={s.empty}>No settled auctions yet</div>;
+    if (rows.length === 0) return (
+        <>
+            <div style={sectionTitleStyle}>Results</div>
+            <div style={s.empty}>No settled or ended auctions yet</div>
+        </>
+    );
 
     return (
         <>
+            <div style={{ marginBottom: '16px' }}>
+                <div style={sectionTitleStyle}>Results</div>
+            </div>
+
             {stats && Number(stats.totalRaisedUsd) > 0 && (
                 <div style={s.totalRaised}>
                     <div style={s.totalRaisedValue}>${Number(stats.totalRaisedUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    <div style={s.totalRaisedLabel}>Total Raised</div>
+                    <div style={s.totalRaisedLabel}>Total Raised Across All Auctions</div>
                 </div>
             )}
-            <div style={s.grid}>
-            {results.map(({ auction, clearing }) => {
-                const clearingPrice = clearing
-                    ? formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))
-                    : '--';
-                const volumeRaised = clearing
-                    ? formatTokenAmount(BigInt(clearing.clearingSellAmount))
-                    : '--';
 
-                return (
-                    <div key={auction.id} style={s.card}>
-                        <div style={s.cardHeader}>
-                            <span style={s.cardTitle}>Auction #{auction.id}</span>
-                            <span style={badgeStyle('success')}>Settled</span>
-                        </div>
-                        <div style={s.priceLabel}>Clearing Price</div>
-                        <div style={s.priceValue}>{clearingPrice}</div>
-                        <div style={s.row}>
-                            <span style={s.label}>Volume Raised</span>
-                            <span style={s.value}>{volumeRaised}</span>
-                        </div>
-                        <div style={s.row}>
-                            <span style={s.label}>Orders Filled</span>
-                            <span style={s.value}>{auction.orderCount} / 100</span>
-                        </div>
-                        <div style={s.row}>
-                            <span style={s.label}>Sell Amount</span>
-                            <span style={s.value}>{formatTokenAmount(BigInt(auction.auctionedSellAmount))}</span>
-                        </div>
-                    </div>
-                );
-            })}
+            <div style={s.tableWrap}>
+                <table style={s.table}>
+                    <thead>
+                        <tr style={{ borderBottom: `1px solid ${color.borderStrong}`, background: color.bgElevated }}>
+                            <th style={s.th}>Auction</th>
+                            <th style={s.th}>Total Auction Tokens</th>
+                            <th style={s.th}>Total Raised</th>
+                            <th style={s.th}>Total Raised (USD)</th>
+                            <th style={s.th}>Clearing Price (USD)</th>
+                            <th style={s.th}>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(({ auction: a, clearing, usdPrice }) => {
+                            const totalBid = BigInt(a.totalBidAmount || '0');
+                            const totalBidHuman = Number(totalBid) / 1e8;
+                            const usdValue = usdPrice > 0 && totalBidHuman > 0
+                                ? `$${(totalBidHuman * usdPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : '--';
+
+                            let clearingPrice = '--';
+                            if (clearing) {
+                                const tokenRatio = Number(clearing.clearingSellAmount) / Number(clearing.clearingBuyAmount);
+                                if (usdPrice > 0) {
+                                    clearingPrice = `$${(tokenRatio * usdPrice).toFixed(2)}`;
+                                } else {
+                                    clearingPrice = formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount)) + ` ${a.biddingTokenSymbol}`;
+                                }
+                            }
+
+                            const isSettled = a.isSettled;
+
+                            return (
+                                <tr key={a.id} style={s.row}>
+                                    <td style={s.td}>
+                                        <div style={s.auctionName}>{a.auctioningTokenName || `Auction #${a.id}`}</div>
+                                    </td>
+                                    <td style={s.td}>
+                                        {formatTokenAmount(BigInt(a.auctionedSellAmount)).split('.')[0]} {a.auctioningTokenSymbol}
+                                    </td>
+                                    <td style={s.td}>
+                                        {formatTokenAmount(totalBid).split('.')[0]} {a.biddingTokenSymbol}
+                                    </td>
+                                    <td style={s.td}>{usdValue}</td>
+                                    <td style={s.td}>
+                                        <span style={{ color: isSettled ? color.amber : color.textMuted, fontWeight: isSettled ? 600 : 400 }}>
+                                            {clearingPrice}
+                                        </span>
+                                    </td>
+                                    <td style={s.td}>
+                                        <span style={badgeStyle(isSettled ? 'success' : 'muted')}>
+                                            {isSettled ? 'Settled' : 'Ended'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
         </>
     );

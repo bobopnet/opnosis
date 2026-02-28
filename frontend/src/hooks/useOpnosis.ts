@@ -21,6 +21,8 @@ interface UseOpnosisReturn {
     readonly txState: TxState;
     readonly resetTx: () => void;
     readonly hexAddress: string;
+    readonly completedKeys: Set<string>;
+    readonly markCompleted: (key: string) => void;
     readonly createAuction: (params: {
         auctioningToken: string;
         biddingToken: string;
@@ -48,6 +50,10 @@ export function useOpnosis(
     walletAddress?: string,
 ): UseOpnosisReturn {
     const [txState, setTxState] = useState<TxState>(IDLE_TX);
+    const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set());
+    const markCompleted = useCallback((key: string) => {
+        setCompletedKeys((prev) => new Set(prev).add(key));
+    }, []);
 
     const contract = useMemo(() => {
         if (!provider || !btcNetwork || !OPNOSIS_CONTRACT) return null;
@@ -230,5 +236,5 @@ export function useOpnosis(
 
     const hexAddress = address?.toString() ?? '';
 
-    return { txState, resetTx, hexAddress, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
+    return { txState, resetTx, hexAddress, completedKeys, markCompleted, createAuction, placeOrders, cancelOrders, settleAuction, claimOrders, extendAuction, approveToken };
 }

@@ -389,25 +389,29 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
             )}
 
             {/* Settlement Results */}
-            {a.isSettled && clearing && (
-                <div style={s.section}>
-                    <div style={sectionTitleStyle}>Settlement Results</div>
-                    <div style={s.metaGrid}>
-                        <div>
-                            <div style={s.metaLabel}>Clearing Price</div>
-                            <div style={s.clearingPrice}>{formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))}</div>
-                        </div>
-                        <div>
-                            <div style={s.metaLabel}>Clearing Buy Amount</div>
-                            <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingBuyAmount))}</div>
-                        </div>
-                        <div>
-                            <div style={s.metaLabel}>Clearing Sell Amount</div>
-                            <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingSellAmount))}</div>
+            {a.isSettled && clearing && (() => {
+                const tokenRatio = Number(clearing.clearingSellAmount) / Number(clearing.clearingBuyAmount);
+                const usdPerToken = biddingTokenUsdPrice !== null ? tokenRatio * biddingTokenUsdPrice : null;
+                return (
+                    <div style={s.section}>
+                        <div style={sectionTitleStyle}>Settlement Results</div>
+                        <div style={s.metaGrid}>
+                            <div>
+                                <div style={s.metaLabel}>Clearing Price (USD)</div>
+                                <div style={s.clearingPrice}>{usdPerToken !== null ? `$${usdPerToken.toFixed(2)}` : '--'}</div>
+                            </div>
+                            <div>
+                                <div style={s.metaLabel}>Clearing Price ({a.biddingTokenSymbol})</div>
+                                <div style={s.metaValue}>{formatPrice(BigInt(clearing.clearingSellAmount), BigInt(clearing.clearingBuyAmount))}</div>
+                            </div>
+                            <div>
+                                <div style={s.metaLabel}>Total Distributed</div>
+                                <div style={s.metaValue}>{formatTokenAmount(BigInt(clearing.clearingBuyAmount)).split('.')[0]} {a.auctioningTokenSymbol}</div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             {/* Upcoming notice */}
             {a.status === 'upcoming' && (

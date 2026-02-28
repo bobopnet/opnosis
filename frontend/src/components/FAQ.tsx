@@ -265,7 +265,25 @@ const sections: Section[] = [
             },
             {
                 q: 'How is the clearing price determined?',
-                a: 'After the auction ends, bids are sorted from highest to lowest price. The algorithm walks down the sorted list until all sell tokens are allocated. The price of the last winning bid becomes the clearing price, and every winner pays this same price.',
+                a: <>
+                    After the auction ends, bids are sorted from highest to lowest price. The algorithm walks down the sorted list until all sell tokens are allocated. The price of the last winning bid becomes the clearing price, and every winner pays this same price.
+                    <br /><br />
+                    <strong>When demand is lower than supply</strong> (i.e. there are fewer bids than tokens available), all auction tokens are still distributed as long as the minimum funding threshold is met. In this case, the clearing price drops below the lowest bid price, and every bidder receives <strong>more tokens than their minimum</strong> &mdash; proportional to their bid size. This means bidders can get a significantly better deal than the maximum price they were willing to pay.
+                </>,
+            },
+            {
+                q: 'What happens when there are more tokens than demand?',
+                a: <>
+                    This is one of the most powerful features of batch auctions. When the total tokens available exceed what bidders asked for, <strong>all tokens are distributed proportionally</strong> to bidders based on their bid amounts &mdash; as long as the minimum funding threshold is met.
+                    <br /><br />
+                    <strong>Example:</strong> An auction offers 250,000 tokens. Two bidders place bids totalling 115,000 MOTO. Bidder A bid 50,000 MOTO (at $0.10/token max) and Bidder B bid 65,000 MOTO (at $0.20/token max). Because total demand is less than supply, all 250,000 tokens are distributed:
+                    <br /><br />
+                    &bull; Bidder A receives ~108,696 tokens (asked for min 45,684)<br />
+                    &bull; Bidder B receives ~141,304 tokens (asked for min 29,925)<br />
+                    &bull; Clearing price: ~$0.04/token &mdash; far below both bidders&apos; max prices
+                    <br /><br />
+                    Both bidders get far more tokens than their minimum at a much lower price. The auctioneer still receives all 115,000 MOTO, which exceeded their funding threshold.
+                </>,
             },
             {
                 q: 'How do I claim my tokens after settlement?',

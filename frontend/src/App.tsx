@@ -373,6 +373,7 @@ export function App() {
                         <div style={s.pill}><span style={s.pillIcon}>&#9881;</span>Permissionless</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</div>
+                        <div style={s.pill}><span style={s.pillIcon}>&#127873;</span>Full Token Distribution</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</div>
                         <div style={s.pill}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</div>
                     </div>

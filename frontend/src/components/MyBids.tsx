@@ -78,9 +78,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [loading, setLoading] = useState(false);
     const [fetchKey, setFetchKey] = useState(0);
 
-
-
-    const { txState, resetTx, cancelOrders, claimOrders, hexAddress } = opnosis;
+    const { txState, resetTx, cancelOrders, claimOrders, hexAddress, completedKeys, markCompleted } = opnosis;
     const busy = txState.status === 'pending';
 
     const refresh = useCallback(() => setFetchKey((k) => k + 1), []);
@@ -133,18 +131,30 @@ export function MyBids({ connected, opnosis }: Props) {
         return () => { cancelled = true; };
     }, [connected, hexAddress, fetchKey]);
 
+    const bidKey = (auctionId: string, orderId: number) => `${auctionId}-${orderId}`;
+
     const handleCancel = async (row: BidRow) => {
         const ok = await cancelOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
-        if (ok) refresh();
+        if (ok) {
+            markCompleted(bidKey(row.auction.id, row.order.orderId));
+            refresh();
+        }
     };
 
     const handleClaim = async (row: BidRow) => {
         const ok = await claimOrders(BigInt(row.auction.id), [BigInt(row.order.orderId)]);
-        if (ok) refresh();
+        if (ok) {
+            markCompleted(bidKey(row.auction.id, row.order.orderId));
+            refresh();
+        }
     };
 
     const handleClaimAll = async () => {
-        const claimable = rows.filter((r) => r.auction.isSettled && !r.order.cancelled && !r.order.claimed);
+        const claimable = rows.filter((r) => {
+            const key = bidKey(r.auction.id, r.order.orderId);
+            return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
+                && !completedKeys.has(key);
+        });
         if (claimable.length === 0) return;
         // Group by auction ID for batch claiming
         const byAuction = new Map<string, bigint[]>();
@@ -156,6 +166,9 @@ export function MyBids({ connected, opnosis }: Props) {
         for (const [auctionId, orderIds] of byAuction) {
             const ok = await claimOrders(BigInt(auctionId), orderIds);
             if (!ok) return;
+            for (const oid of orderIds) {
+                markCompleted(bidKey(auctionId, Number(oid)));
+            }
         }
         refresh();
     };
@@ -189,7 +202,11 @@ export function MyBids({ connected, opnosis }: Props) {
         );
     }
 
-    const claimableCount = rows.filter((r) => r.auction.isSettled && !r.order.cancelled && !r.order.claimed).length;
+    const claimableCount = rows.filter((r) => {
+        const key = bidKey(r.auction.id, r.order.orderId);
+        return r.auction.isSettled && !r.order.cancelled && !r.order.claimed
+            && !completedKeys.has(key);
+    }).length;
 
     return (
         <>
@@ -219,13 +236,17 @@ export function MyBids({ connected, opnosis }: Props) {
                     <tbody>
                         {rows.map((r) => {
                             const { auction: a, order: o } = r;
-                            const canCancel = !a.isSettled && a.status !== 'ended' && a.status === 'open' && !o.cancelled && !o.claimed;
-                            const canClaim = a.isSettled && !o.cancelled && !o.claimed;
+                            const key = bidKey(a.id, o.orderId);
+                            const isDone = completedKeys.has(key);
+                            const isClaimed = o.claimed || isDone;
+                            const isCancelled = o.cancelled || isDone;
+                            const canCancel = !a.isSettled && a.status !== 'ended' && a.status === 'open' && !isCancelled && !isClaimed;
+                            const canClaim = a.isSettled && !isCancelled && !isClaimed;
 
                             let statusText = 'Active';
                             let statusVariant: 'amber' | 'success' | 'muted' = 'amber';
-                            if (o.cancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
-                            else if (o.claimed) { statusText = 'Claimed'; statusVariant = 'success'; }
+                            if (isCancelled) { statusText = 'Cancelled'; statusVariant = 'muted'; }
+                            else if (isClaimed) { statusText = 'Claimed'; statusVariant = 'success'; }
 
                             return (
                                 <tr key={`${a.id}-${o.orderId}`} style={s.row}>
