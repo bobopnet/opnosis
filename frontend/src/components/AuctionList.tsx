@@ -311,11 +311,11 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
         setExpandedId((prev) => (prev === id ? null : id));
     };
 
-    if (loading) return <div style={s.loading}>Loading auctions...</div>;
-    if (auctions.length === 0) return <div style={s.empty}>No auctions found</div>;
-
     const upcoming = auctions.filter((a) => a.status === 'upcoming');
-    const rest = auctions.filter((a) => a.status !== 'upcoming');
+    const active = auctions.filter((a) => a.status === 'open' || a.status === 'cancellation_closed');
+
+    if (loading) return <div style={s.loading}>Loading auctions...</div>;
+    if (upcoming.length === 0 && active.length === 0) return <div style={s.empty}>No active or upcoming auctions</div>;
 
     const renderExpandedDetail = (a: IndexedAuction) => (
         <div style={s.detail}>
@@ -380,6 +380,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         </div>
                     </div>
                     <button
+                        className="glow-amber"
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleExtend(a); }}
@@ -442,6 +443,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         </div>
                     )}
                     <button
+                        className="glow-amber"
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleBid(a); }}
@@ -454,6 +456,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                 <div style={s.section}>
                     <div style={sectionTitleStyle}>{a.status === 'ended' ? 'Settlement' : 'Atomic Closure'}</div>
                     <button
+                        className="glow-amber"
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleSettle(a); }}
@@ -476,6 +479,7 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                         />
                     </div>
                     <button
+                        className="glow-amber"
                         style={{ ...btnPrimary, ...(busy || !connected ? btnDisabled : {}) }}
                         disabled={busy || !connected}
                         onClick={(e) => { e.stopPropagation(); void handleClaim(a); }}
@@ -552,8 +556,8 @@ export function AuctionList({ connected, opnosis, refreshKey }: Props) {
                     <div style={{ ...s.grid, marginBottom: '32px' }}>{upcoming.map(renderCard)}</div>
                 </>
             )}
-            {rest.length > 0 && (
-                <div style={s.grid}>{rest.map(renderCard)}</div>
+            {active.length > 0 && (
+                <div style={s.grid}>{active.map(renderCard)}</div>
             )}
         </>
     );

@@ -333,10 +333,10 @@ export function App() {
                             <div style={s.walletAddr}>
                                 {walletAddress.slice(0, 8)}...{walletAddress.slice(-6)} ({networkName})
                             </div>
-                            <button style={s.disconnectBtn} onClick={disconnect}>Disconnect</button>
+                            <button className="glow-purple" style={s.disconnectBtn} onClick={disconnect}>Disconnect</button>
                         </div>
                     ) : (
-                        <button style={s.connectBtn} onClick={openConnectModal} disabled={connecting}>
+                        <button className="glow-amber" style={s.connectBtn} onClick={openConnectModal} disabled={connecting}>
                             {connecting ? 'Connecting...' : 'Connect Wallet'}
                         </button>
                     )}
@@ -359,8 +359,8 @@ export function App() {
                             No front-running. No MEV. Pure price discovery powered by OPNet.
                         </p>
                         <div style={s.heroBtns}>
-                            <button style={btnPrimary} onClick={() => setTab('browse')}>Browse Auctions</button>
-                            <button style={btnSecondary} onClick={() => setTab('create')}>Create Auction</button>
+                            <button className="glow-amber" style={btnPrimary} onClick={() => setTab('browse')}>Browse Auctions</button>
+                            <button className="glow-purple" style={btnSecondary} onClick={() => setTab('create')}>Create Auction</button>
                         </div>
                     </section>
                 )}

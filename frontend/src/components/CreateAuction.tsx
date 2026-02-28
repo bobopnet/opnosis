@@ -165,12 +165,12 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         const price = parseFloat(val);
         const sell = parseFloat(sellAmount);
         if (price > 0 && sell > 0) {
-            setMinReceiveBidding(((price * sell) / biddingTokenUsdPrice!).toFixed(8).replace(/\.?0+$/, ''));
+            setMinReceiveBidding(Math.floor((price * sell) / biddingTokenUsdPrice!).toString());
         }
     };
 
     const onMinReceiveChange = (val: string) => {
-        setMinReceiveBidding(val);
+        setMinReceiveBidding(val.replace(/\./g, ''));
         if (!canCompute) return;
         const minRcv = parseFloat(val);
         const sell = parseFloat(sellAmount);
@@ -186,7 +186,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         const price = parseFloat(reservePriceUsd);
         const sell = parseFloat(val);
         if (price > 0 && sell > 0) {
-            setMinReceiveBidding(((price * sell) / biddingTokenUsdPrice!).toFixed(8).replace(/\.?0+$/, ''));
+            setMinReceiveBidding(Math.floor((price * sell) / biddingTokenUsdPrice!).toString());
         }
     };
 
@@ -265,11 +265,11 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
             <div style={s.row}>
                 <div style={s.field}>
                     <label style={labelStyle}>Total Auction Tokens{auctioningTokenSymbol ? ` (${auctioningTokenSymbol})` : ''}<HelpTip text="The total number of tokens to be distributed to winning bidders." /></label>
-                    <input style={inputStyle} value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value)} placeholder="100.0" />
+                    <input style={inputStyle} value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value.replace(/\./g, ''))} placeholder="100" />
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If the total bid amount does not reach this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 for no minimum — the auction will succeed regardless of how much is raised." /></label>
-                    <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value)} placeholder="0" />
+                    <input style={inputStyle} value={minFunding} onChange={(e) => setMinFunding(e.target.value.replace(/\./g, ''))} placeholder="0" />
                     {(() => {
                         const val = parseFloat(minFunding);
                         if (!val || val <= 0 || biddingTokenUsdPrice === null) return null;
@@ -323,18 +323,18 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                 <div style={s.field}>
                     <label style={labelStyle}>Cancel Window (optional)<HelpTip text={startMode === 'schedule' ? 'How long after the scheduled start bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.' : 'How long from now bidders are allowed to cancel their bids. Once this window closes, all placed bids are locked in and cannot be withdrawn.'} /></label>
                     <div style={s.dualInput}>
-                        <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value)} />
+                        <input style={s.shortInput} type="number" min="0" value={cancelDays} onChange={(e) => setCancelDays(e.target.value.replace(/\./g, ''))} />
                         <span style={s.unitLabel}>days</span>
-                        <input style={s.shortInput} type="number" min="0" max="23" value={cancelHours} onChange={(e) => setCancelHours(e.target.value)} />
+                        <input style={s.shortInput} type="number" min="0" max="23" value={cancelHours} onChange={(e) => setCancelHours(e.target.value.replace(/\./g, ''))} />
                         <span style={s.unitLabel}>hours</span>
                     </div>
                 </div>
                 <div style={s.field}>
                     <label style={labelStyle}>Auction Duration<HelpTip text={startMode === 'schedule' ? 'How long the auction runs after the scheduled start. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.' : 'How long the auction runs from now. No new bids can be placed after this period ends, and the auction becomes eligible for settlement.'} /></label>
                     <div style={s.dualInput}>
-                        <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value)} />
+                        <input style={s.shortInput} type="number" min="0" value={auctionDays} onChange={(e) => setAuctionDays(e.target.value.replace(/\./g, ''))} />
                         <span style={s.unitLabel}>days</span>
-                        <input style={s.shortInput} type="number" min="0" max="23" value={auctionHours} onChange={(e) => setAuctionHours(e.target.value)} />
+                        <input style={s.shortInput} type="number" min="0" max="23" value={auctionHours} onChange={(e) => setAuctionHours(e.target.value.replace(/\./g, ''))} />
                         <span style={s.unitLabel}>hours</span>
                     </div>
                 </div>
@@ -347,6 +347,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
             {step === 'approve' ? (
                 <button
+                    className="glow-amber"
                     style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
                     disabled={busy || !connected}
                     onClick={() => void handleApprove()}
@@ -355,6 +356,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                 </button>
             ) : (
                 <button
+                    className="glow-amber"
                     style={{ ...btnPrimary, width: '100%', ...(busy || !connected ? btnDisabled : {}) }}
                     disabled={busy || !connected}
                     onClick={() => void handleCreate()}

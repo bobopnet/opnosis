@@ -78,7 +78,7 @@ export function MyBids({ connected, opnosis }: Props) {
     const [loading, setLoading] = useState(false);
     const [fetchKey, setFetchKey] = useState(0);
 
-    const [hoveredCancel, setHoveredCancel] = useState<string | null>(null);
+
 
     const { txState, resetTx, cancelOrders, claimOrders, hexAddress } = opnosis;
     const busy = txState.status === 'pending';
@@ -197,6 +197,7 @@ export function MyBids({ connected, opnosis }: Props) {
                 <div style={sectionTitleStyle}>My Bids</div>
                 {claimableCount >= 2 && (
                     <button
+                        className="glow-amber"
                         style={{ ...btnPrimary, padding: '8px 18px', fontSize: '13px', ...(busy ? btnDisabled : {}) }}
                         disabled={busy}
                         onClick={() => void handleClaimAll()}
@@ -235,27 +236,17 @@ export function MyBids({ connected, opnosis }: Props) {
                                     <td style={s.td}>{formatTokenAmount(BigInt(o.buyAmount)).split('.')[0]} {a.auctioningTokenSymbol}</td>
                                     <td style={s.td}><span style={badgeStyle(statusVariant)}>{statusText}</span></td>
                                     <td style={s.td}>
-                                        {canCancel && (() => {
-                                            const key = `${a.id}-${o.orderId}`;
-                                            const glow = hoveredCancel === key && !busy;
-                                            return (
-                                                <button
-                                                    style={{
-                                                        ...btnSecondary,
-                                                        padding: '4px 12px',
-                                                        fontSize: '12px',
-                                                        ...(busy ? btnDisabled : {}),
-                                                        ...(glow ? { boxShadow: `0 0 12px ${color.purple}, 0 0 24px rgba(128, 64, 149, 0.3)`, borderColor: color.purpleLight } : {}),
-                                                    }}
-                                                    disabled={busy}
-                                                    onMouseEnter={() => setHoveredCancel(key)}
-                                                    onMouseLeave={() => setHoveredCancel(null)}
-                                                    onClick={() => void handleCancel(r)}
-                                                >Cancel</button>
-                                            );
-                                        })()}
+                                        {canCancel && (
+                                            <button
+                                                className="glow-purple"
+                                                style={{ ...btnSecondary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
+                                                disabled={busy}
+                                                onClick={() => void handleCancel(r)}
+                                            >Cancel</button>
+                                        )}
                                         {canClaim && (
                                             <button
+                                                className="glow-amber"
                                                 style={{ ...btnPrimary, padding: '4px 12px', fontSize: '12px', ...(busy ? btnDisabled : {}) }}
                                                 disabled={busy}
                                                 onClick={() => void handleClaim(r)}

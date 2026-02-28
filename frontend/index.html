@@ -106,6 +106,17 @@
             :focus-visible { outline: 2px solid var(--purple-light); outline-offset: 2px; }
             button:focus:not(:focus-visible), select:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
 
+            /* Button hover glow */
+            .glow-amber:hover:not(:disabled) {
+                box-shadow: 0 0 24px rgba(232, 148, 26, 0.6), 0 4px 16px rgba(232, 148, 26, 0.3) !important;
+                transform: translateY(-1px);
+            }
+            .glow-purple:hover:not(:disabled) {
+                box-shadow: 0 0 24px rgba(155, 77, 187, 0.5), 0 4px 16px rgba(155, 77, 187, 0.25) !important;
+                border-color: var(--purple-light) !important;
+                transform: translateY(-1px);
+            }
+
             /* WalletConnect popup CSS fix — REQUIRED */
             .wallet-connect-modal,
             [class*="walletconnect"] [class*="modal"],
