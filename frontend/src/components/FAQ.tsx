@@ -132,7 +132,6 @@ const fieldTable = (
             <tr><td style={s.tdField}>Start Mode</td><td style={s.td}>&ldquo;Start Now&rdquo; opens bidding immediately. &ldquo;Schedule Start&rdquo; delays bidding until a chosen date and time. Note: scheduled times are based on blockchain time, which can differ from your wall clock by a few minutes.</td></tr>
             <tr><td style={s.tdField}>Cancel Window</td><td style={s.td}>Minutes during which bidders can cancel. After this, bids are final.</td></tr>
             <tr><td style={s.tdField}>Auction Duration</td><td style={s.td}>Minutes the auction accepts bids before settlement.</td></tr>
-            <tr><td style={s.tdField}>Atomic Closure</td><td style={s.td}>When enabled, the auctioneer can settle the auction early once the min funding threshold is met. When disabled, the auction always runs for the full duration.</td></tr>
         </tbody>
     </table>
 );
@@ -222,29 +221,29 @@ const sections: Section[] = [
                 </>,
             },
             {
-                id: 'atomic-closure',
-                q: 'What is atomic closure and should I enable it?',
+                id: 'early-settlement',
+                q: 'Can I settle my auction early?',
                 a: <>
-                    Atomic closure lets the auctioneer settle their auction early — before the scheduled end time. Only the auctioneer can trigger early settlement; no one else can.
+                    Yes. Every auction has <strong>early settlement</strong> built in. As the auctioneer, you can settle your auction before the scheduled end time as long as the minimum funding threshold has been met.
                     <br /><br />
-                    <strong>Enable it</strong> if you want the flexibility to close a fundraise early once the minimum funding threshold is met. This is useful when speed matters more than maximizing participation.
+                    To settle early, go to the <strong>Browse</strong> page, connect the same wallet that created the auction, and expand your auction card. An <strong>Atomic Closure</strong> section with a &ldquo;Settle Now&rdquo; button will appear. This section is only visible to the auctioneer while the auction is still open.
                     <br /><br />
-                    <strong>Disable it</strong> if you want the auction to run for the full duration, giving all potential bidders time to participate. This maximizes price discovery and is the safer default for most auctions.
-                    <br /><br />
-                    Note: early settlement is only possible when the min funding threshold has been reached. If bids are below the threshold, the auctioneer must wait for more bids or let the auction run to its end.
+                    Early settlement is useful when a fundraise fills quickly and you don&apos;t need to wait for the full duration. Note: early settlement is only possible when the min funding threshold has been reached. If bids are below the threshold, you must wait for more bids or let the auction run to its end.
                 </>,
             },
             {
-                q: 'How do I trigger atomic closure as the auctioneer?',
+                id: 'manual-settlement',
+                q: 'What if my auction is stuck in "Settling" status?',
                 a: <>
-                    If your auction has atomic closure enabled and the minimum funding threshold has been met, you can settle it early from the <strong>Browse</strong> page:
+                    After an auction ends, the Opnosis backend automatically settles it. If the backend is temporarily unavailable or encounters an issue, the auction may appear stuck in &ldquo;Settling&rdquo; status.
                     <br /><br />
-                    1. Connect the same wallet that created the auction.<br />
-                    2. Find and expand your auction card.<br />
-                    3. An <strong>Atomic Closure</strong> section will appear with a &ldquo;Settle Now&rdquo; button.<br />
-                    4. Click it and confirm the transaction in your wallet.
+                    In this case, <strong>anyone</strong> with a connected wallet can manually settle the auction:
                     <br /><br />
-                    This section is only visible to the auctioneer and only while the auction is still open. Once settled, bidders can claim their tokens from the <strong>My Bids</strong> tab.
+                    1. Go to the <strong>Browse</strong> page and expand the auction card.<br />
+                    2. A <strong>Settlement</strong> section with a &ldquo;Settle Auction&rdquo; button will appear.<br />
+                    3. Click it and confirm the transaction in your wallet.
+                    <br /><br />
+                    Manual settlement costs a small amount of BTC for gas. Once settled, token distribution is triggered automatically.
                 </>,
             },
             {
@@ -280,13 +279,15 @@ const sections: Section[] = [
             },
             {
                 id: 'grace-period',
-                q: 'What happens if I place a bid right before the auction ends?',
+                q: 'What is the Dynamic Grace Period?',
                 a: <>
-                    Opnosis Auction includes a <strong>10-minute grace period</strong> after the auction end time. If you submit your bid before the deadline but the Bitcoin block confirming your transaction is mined after the auction ends, your bid will still be accepted as long as it confirms within the grace window.
+                    Opnosis Auction uses a <strong>Dynamic Grace Period</strong> to protect bids submitted near the auction deadline without unnecessarily delaying settlement.
                     <br /><br />
-                    The bid form is disabled as soon as the auction end time passes, so no new bids can be submitted during the grace period &mdash; it only protects bids that were already broadcast to the network before the deadline.
+                    Placing a bid can require up to two Bitcoin transactions (token approval + bid placement), each needing a block confirmation. Since Bitcoin blocks can occasionally take 15&ndash;45+ minutes, a safety window is needed to include bids broadcast before the deadline.
                     <br /><br />
-                    Settlement does not begin until the grace period expires, ensuring all eligible bids are included in the final clearing price calculation.
+                    <strong>How it works:</strong> When an auction ends, the system records the current Bitcoin block height on-chain. Settlement is allowed after <strong>1 additional block confirmation</strong> &mdash; typically 10&ndash;15 minutes. This means most auctions settle quickly. A <strong>1-hour hard cap</strong> acts as a safety net in case of exceptionally slow blocks.
+                    <br /><br />
+                    The bid form is disabled as soon as the auction end time passes &mdash; no new bids can be submitted during the grace period. It only protects bids that were already broadcast to the network before the deadline.
                 </>,
             },
             {
@@ -344,7 +345,7 @@ const sections: Section[] = [
                 id: 'auto-settlement',
                 q: 'How does automatic settlement and token distribution work?',
                 a: <>
-                    Once an auction ends, a <strong>10-minute grace period</strong> allows any bids that were submitted before the deadline but not yet confirmed on-chain to be included. After the grace period, the Opnosis backend automatically handles everything &mdash; no action required from the auctioneer or bidders.
+                    Once an auction ends, the <strong>Dynamic Grace Period</strong> ensures any bids submitted before the deadline but not yet confirmed on-chain are included. In most cases, settlement happens within minutes &mdash; after just one additional Bitcoin block confirmation. A 1-hour hard cap acts as a safety net for exceptionally slow blocks. See <a href="#" onClick={(e) => { e.stopPropagation(); const el = document.getElementById('grace-period'); if (el) { el.click(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }} style={{ color: '#c4b5fd', textDecoration: 'underline' }}>Dynamic Grace Period</a> for details. After the grace period, the Opnosis backend automatically handles everything &mdash; no action required from the auctioneer or bidders.
                     <br /><br />
                     <strong>Step 1 &mdash; Settlement:</strong> After the grace period, the backend detects when an auction has ended and submits a settlement transaction that computes the clearing price on-chain.
                     <br /><br />

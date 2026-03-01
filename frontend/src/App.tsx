@@ -404,7 +404,8 @@ export function App() {
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('bitcoin-native')}><span style={s.pillIcon}>&#8383;</span>Bitcoin Native</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('open-source')}><span style={s.pillIcon}>&#128272;</span>Fully Open Source</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('full-distribution')}><span style={s.pillIcon}>&#127873;</span>Full Token Distribution</button>
-                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('atomic-closure')}><span style={s.pillIcon}>&#9889;</span>Atomic Closure</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('early-settlement')}><span style={s.pillIcon}>&#9889;</span>Early Settlement</button>
+                        <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('grace-period')}><span style={s.pillIcon}>&#9202;</span>Dynamic Grace Period</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('extendable')}><span style={s.pillIcon}>&#8634;</span>Extendable by Auctioneer</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('auto-settlement')}><span style={s.pillIcon}>&#9203;</span>Automatic Settlement</button>
                         <button className="glow-purple" style={s.pillBtn} onClick={() => goToFaq('no-fee-failed')}><span style={s.pillIcon}>&#10003;</span>No Fee on Failed Auctions</button>

@@ -66,9 +66,10 @@ interface BidRow {
     order: IndexedOrder;
 }
 
-type DisplayRow = BidRow & { isPending?: boolean };
+type DisplayRow = BidRow & { isPending?: boolean; isDropped?: boolean };
 
 const PENDING_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const DROPPED_CLEANUP_MS = 60 * 60 * 1000; // 1 hour — clean up dropped bids after this
 interface Props {
     readonly connected: boolean;
     readonly opnosis: ReturnType<typeof useOpnosis>;
@@ -286,14 +287,15 @@ export function MyBids({ connected, opnosis }: Props) {
     useEffect(() => {
         const now = Date.now();
         for (const pb of pendingBids) {
-            if (now - pb.timestamp > PENDING_EXPIRY_MS) {
-                removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
-                continue;
-            }
             const matched = rows.some(
                 (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
             );
             if (matched) {
+                removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
+                continue;
+            }
+            // Only clean up dropped bids after a long period (1 hour)
+            if (now - pb.timestamp > DROPPED_CLEANUP_MS) {
                 removePendingBid(pb.auctionId, pb.sellAmount, pb.buyAmount);
             }
         }
@@ -305,14 +307,15 @@ export function MyBids({ connected, opnosis }: Props) {
         const now = Date.now();
         const result: DisplayRow[] = [...rows];
 
-        // Add unmatched, non-expired pending bids for the current wallet only
+        // Add unmatched pending bids for the current wallet
         for (const pb of pendingBids) {
-            if (now - pb.timestamp > PENDING_EXPIRY_MS) continue;
             if (pb.address.toLowerCase() !== hexAddress.toLowerCase()) continue;
             const matched = rows.some(
                 (r) => r.auction.id === pb.auctionId && r.order.sellAmount === pb.sellAmount,
             );
             if (matched) continue;
+
+            const expired = now - pb.timestamp > PENDING_EXPIRY_MS;
 
             const auction = auctions.find((a) => a.id === pb.auctionId);
             // Build auction metadata from fetched data or pending bid snapshot
@@ -353,7 +356,8 @@ export function MyBids({ connected, opnosis }: Props) {
                     cancelled: false,
                     claimed: false,
                 },
-                isPending: true,
+                isPending: !expired,
+                isDropped: expired,
             });
         }
 
@@ -423,7 +427,7 @@ export function MyBids({ connected, opnosis }: Props) {
                         {displayRows.map((r, idx) => {
                             const { auction: a, order: o } = r;
 
-                            if (r.isPending) {
+                            if (r.isPending || r.isDropped) {
                                 const pUsd = usdPrices.get(a.biddingToken);
                                 const pendingMaxUsd = (() => {
                                     if (!pUsd) return '--';
@@ -435,7 +439,7 @@ export function MyBids({ connected, opnosis }: Props) {
                                     return `$${(sellF / buyF * pUsd).toFixed(4)}`;
                                 })();
                                 return (
-                                    <tr key={`pending-${idx}`} style={s.row}>
+                                    <tr key={`pending-${idx}`} style={{ ...s.row, ...(r.isDropped ? { opacity: 0.6 } : {}) }}>
                                         <td style={s.td}>
                                             <div style={s.auctionName}>{a.auctioningTokenName || 'Auction'}</div>
                                         </td>
@@ -445,9 +449,13 @@ export function MyBids({ connected, opnosis }: Props) {
                                         <td style={s.td}>--</td>
                                         <td style={s.td}>--</td>
                                         <td style={s.td}>
-                                            <span style={badgeStyle('pending')}>Pending</span>
+                                            {r.isDropped
+                                                ? <span style={badgeStyle('error')}>Dropped</span>
+                                                : <span style={badgeStyle('pending')}>Pending</span>}
                                         </td>
-                                        <td style={s.td}></td>
+                                        <td style={s.td}>
+                                            {r.isDropped && <span style={{ fontSize: '11px', color: color.textMuted }}>UTXO conflict</span>}
+                                        </td>
                                     </tr>
                                 );
                             }

@@ -132,8 +132,9 @@ const settleAttempted = new Set<number>();
 const settleRetries = new Map<number, number>();
 const refundAttempted = new Set<number>();
 const refundRetries = new Map<number, number>();
-const MAX_SETTLE_RETRIES = 10;
-const MAX_REFUND_RETRIES = 10;
+const closeRecorded = new Set<number>();
+const MAX_SETTLE_RETRIES = 750;
+const MAX_REFUND_RETRIES = 750;
 let _txParams: TransactionParameters | null = null;
 
 // Token metadata cache
@@ -371,6 +372,29 @@ async function pollOnce(contract: OpnosisContract, cache: Cache): Promise<void> 
             }
         } catch {
             // totalBidAmount stays at previous value
+        }
+    }
+
+    // Record auction close block height for ended auctions (enables early settlement after +1 block)
+    if (_txParams) {
+        for (const [id, auction] of auctions) {
+            if (auction.isSettled || auction.status !== 'ended') continue;
+            if (closeRecorded.has(id)) continue;
+            try {
+                const sim = await contract.simulateRecordAuctionClose(BigInt(id));
+                if ('error' in (sim as object)) {
+                    // May already be recorded or auction not yet ended on-chain — skip silently
+                    closeRecorded.add(id);
+                    continue;
+                }
+                const sendable = sim as { sendTransaction(params: TransactionParameters): Promise<unknown> };
+                await sendable.sendTransaction(_txParams);
+                console.log(`Recorded auction close block height for auction ${id}`);
+                closeRecorded.add(id);
+            } catch (err) {
+                console.warn(`recordAuctionClose auction ${id} failed:`, err);
+                // Will retry next poll cycle
+            }
         }
     }
 

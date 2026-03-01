@@ -134,7 +134,7 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [auctionDays, setAuctionDays] = useState('0');
     const [auctionHours, setAuctionHours] = useState('0');
     const [auctionMinutes, setAuctionMinutes] = useState('0');
-    const [atomicClose, setAtomicClose] = useState(false);
+    const atomicClose = true; // Always enabled — auctioneer can settle early when min funding met
     const [step, setStep] = useState<'ready' | 'approving' | 'creating'>('ready');
     const [biddingTokenUsdPrice, setBiddingTokenUsdPrice] = useState<number | null>(null);
     const [customAuctioningSymbol, setCustomAuctioningSymbol] = useState('');
@@ -476,11 +476,6 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     </div>
                 </div>
             </div>
-            <label style={s.checkbox}>
-                <input type="checkbox" checked={atomicClose} onChange={(e) => setAtomicClose(e.target.checked)} />
-                Allow atomic closure
-                <HelpTip text="When enabled, the auctioneer can settle the auction early once the min funding threshold is met. Useful for fast fundraises, but may reduce price discovery by cutting off later bids. When disabled, the auction runs for the full duration, maximizing participation and price discovery." />
-            </label>
 
             {(() => {
                 const sellNum = parseFloat(sellAmount);

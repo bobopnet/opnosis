@@ -100,6 +100,16 @@ export type PrecalculateSellAmountSum = CallResult<
 >;
 
 /**
+ * @description Represents the result of the recordAuctionClose function call.
+ */
+export type RecordAuctionClose = CallResult<
+    {
+        blockHeight: bigint;
+    },
+    OPNetEvent<never>[]
+>;
+
+/**
  * @description Represents the result of the settleAuction function call.
  */
 export type SettleAuction = CallResult<
@@ -209,6 +219,7 @@ export interface IOpnosis extends IOP_NETContract {
     placeSellOrders(auctionId: bigint, minBuyAmounts: bigint[], sellAmounts: bigint[]): Promise<PlaceSellOrders>;
     cancelSellOrders(auctionId: bigint, orderIds: bigint[]): Promise<CancelSellOrders>;
     precalculateSellAmountSum(auctionId: bigint, iterationSteps: bigint): Promise<PrecalculateSellAmountSum>;
+    recordAuctionClose(auctionId: bigint): Promise<RecordAuctionClose>;
     settleAuction(auctionId: bigint): Promise<SettleAuction>;
     claimFromParticipantOrder(auctionId: bigint, orderIds: bigint[]): Promise<ClaimFromParticipantOrder>;
     setFeeParameters(feeNumerator: bigint, feeReceiver: Address): Promise<SetFeeParameters>;

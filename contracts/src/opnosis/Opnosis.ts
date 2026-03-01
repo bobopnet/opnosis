@@ -131,9 +131,20 @@ const MAX_FEE_NUMERATOR: u256 = u256.fromU32(15);
  * so no NEW bids can be submitted during the grace window.
  * Settlement is also blocked until the grace period expires.
  *
- * 600 seconds = 10 minutes (roughly 1 Bitcoin block).
+ * 3600 seconds = 1 hour hard cap. This is the maximum grace period — settlement
+ * is always allowed after this time. In practice, settlement usually happens much
+ * sooner via the block-based early settlement mechanism (recordAuctionClose +
+ * MIN_GRACE_BLOCKS), which allows settlement 1 block after the auction close is
+ * recorded on-chain.
  */
-const BID_GRACE_PERIOD: u256 = u256.fromU32(600);
+const BID_GRACE_PERIOD: u256 = u256.fromU32(3600);
+
+/**
+ * Minimum number of Bitcoin blocks that must pass after recordAuctionClose()
+ * before settlement is allowed. 1 block ensures any bids in the mempool at
+ * auction end are included.
+ */
+const MIN_GRACE_BLOCKS: u64 = 1;
 
 /**
  * Sentinel value for clearingOrderId meaning "no bidder order found as clearing
@@ -372,6 +383,12 @@ export class Opnosis extends OP_NET {
         this.pOrderPlacementStart,
     );
 
+    // Per-auction close block height — recorded by recordAuctionClose() (pointer 37)
+    private readonly pAuctionCloseBlock: u16 = Blockchain.nextPointer; // 37
+    private readonly mapAuctionCloseBlock: StoredMapU256 = new StoredMapU256(
+        this.pAuctionCloseBlock,
+    );
+
     public constructor() {
         super();
     }
@@ -439,9 +456,11 @@ export class Opnosis extends OP_NET {
      */
     /**
      * Revert if auction is not in the solution-submission phase.
-     * Settlement is blocked until auctionEndDate + BID_GRACE_PERIOD so that
-     * late-confirming bids are included before the clearing price is computed.
-     * Exception: atomic closure by the auctioneer can still settle early.
+     *
+     * Settlement is allowed when ANY of these conditions is met:
+     *   1. blockTimestamp >= auctionEndDate + BID_GRACE_PERIOD (hard cap, e.g. 1 hour)
+     *   2. recordAuctionClose() was called AND currentBlock >= closeBlock + MIN_GRACE_BLOCKS
+     *   3. Atomic closure by the auctioneer (before auction end, if enabled)
      */
     private requireSolutionSubmission(auctionId: u256): void {
         if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
@@ -453,20 +472,34 @@ export class Opnosis extends OP_NET {
         const now = u256.fromU64(Blockchain.block.medianTimestamp);
         const endDate = this.mapAuctionEnd.get(auctionId);
         const graceDeadline = SafeMath.add(endDate, BID_GRACE_PERIOD);
-        if (now < graceDeadline) {
-            // Still within auction + grace period — allow early settlement only
-            // if atomic closure is enabled AND the caller is the auctioneer.
-            const atomicAllowed = !u256.eq(this.mapIsAtomic.get(auctionId), u256.Zero);
-            if (!atomicAllowed) {
-                throw new Revert('Opnosis: auction has not ended yet');
+
+        // Condition 1: hard cap grace period has fully elapsed — always allow.
+        if (now >= graceDeadline) return;
+
+        // Condition 2: block-based early settlement — auction close was recorded
+        // and enough blocks have passed since.
+        if (now >= endDate) {
+            const closeBlock = this.mapAuctionCloseBlock.get(auctionId);
+            if (!u256.eq(closeBlock, u256.Zero)) {
+                const closeBlockU64: u64 = <u64>closeBlock.lo1;
+                if (Blockchain.block.number >= closeBlockU64 + MIN_GRACE_BLOCKS) {
+                    return; // enough blocks have passed — allow settlement
+                }
             }
-            const senderKey = addrToU256(Blockchain.tx.sender);
-            const auctioneerKey = this.mapUserIdToAddr.get(
-                this.mapAuctioneerUserId.get(auctionId),
-            );
-            if (!u256.eq(senderKey, auctioneerKey)) {
-                throw new Revert('Opnosis: only auctioneer can settle early');
-            }
+            // Within grace period and block check not met — fall through to atomic check.
+        }
+
+        // Condition 3: atomic closure by auctioneer (before or during grace period).
+        const atomicAllowed = !u256.eq(this.mapIsAtomic.get(auctionId), u256.Zero);
+        if (!atomicAllowed) {
+            throw new Revert('Opnosis: grace period not elapsed');
+        }
+        const senderKey = addrToU256(Blockchain.tx.sender);
+        const auctioneerKey = this.mapUserIdToAddr.get(
+            this.mapAuctioneerUserId.get(auctionId),
+        );
+        if (!u256.eq(senderKey, auctioneerKey)) {
+            throw new Revert('Opnosis: only auctioneer can settle early');
         }
     }
 
@@ -564,6 +597,7 @@ export class Opnosis extends OP_NET {
         }
 
         const auctionedSellAmount = this.mapSellAmount.get(auctionId);
+        const minBuyAmountBidding = this.mapMinBuyAmount.get(auctionId);
         const totalOrders = u256ToU32(this.mapOrderCount.get(auctionId));
         let sumBid = this.mapInterimSumBid.get(auctionId);
         let rank = u256ToU32(this.mapInterimRank.get(auctionId));
@@ -571,7 +605,7 @@ export class Opnosis extends OP_NET {
         for (let i: u32 = 0; i < steps; i++) {
             if (rank >= totalOrders) {
                 // Exhausted all orders — clearing stays at initial auction order (CLEARING_NONE).
-                // sumBid = total valid bidding tokens collected.
+                // sumBid = total valid bidding tokens collected (above-reserve only).
                 this.mapInterimSumBid.set(auctionId, sumBid);
                 this.mapInterimRank.set(auctionId, u256.fromU32(rank));
                 return false;
@@ -587,6 +621,14 @@ export class Opnosis extends OP_NET {
 
             const buyAmt = this.mapOrderBuy.get(orderKey(auctionId, orderId));
             const sellAmt = this.mapOrderSell.get(orderKey(auctionId, orderId));
+
+            // Skip below-reserve bids — they are accepted on-chain for visibility
+            // but must not contribute to bidRaised or clearing price calculations.
+            // They will be refunded during claimFromParticipantOrder.
+            if (!meetsMinPrice(sellAmt, buyAmt, minBuyAmountBidding, auctionedSellAmount)) {
+                rank += 1;
+                continue;
+            }
 
             // Check clearing condition BEFORE adding this order's contribution.
             // sumBid is the bidding tokens from all higher-priced orders already processed
@@ -1197,6 +1239,48 @@ export class Opnosis extends OP_NET {
     }
 
     /**
+     * Record the block height at which the auction close was first observed on-chain.
+     * This enables block-based early settlement: once MIN_GRACE_BLOCKS have passed
+     * after this recorded block, settleAuction() is allowed without waiting for the
+     * full BID_GRACE_PERIOD (1-hour hard cap).
+     *
+     * Anyone can call this after the auction end time. It is idempotent — only the
+     * first call records the block height; subsequent calls are no-ops.
+     * The backend calls this automatically after detecting an auction has ended.
+     *
+     * @param auctionId  The auction to record close for.
+     * @returns blockHeight  The recorded close block height.
+     */
+    @method({ name: 'auctionId', type: ABIDataTypes.UINT256 })
+    @returns({ name: 'blockHeight', type: ABIDataTypes.UINT256 })
+    public recordAuctionClose(calldata: Calldata): BytesWriter {
+        const auctionId = calldata.readU256();
+
+        if (u256.eq(this.mapSellAmount.get(auctionId), u256.Zero)) {
+            throw new Revert('Opnosis: auction does not exist');
+        }
+        if (!u256.eq(this.mapSettled.get(auctionId), u256.Zero)) {
+            throw new Revert('Opnosis: auction already settled');
+        }
+        const now = u256.fromU64(Blockchain.block.medianTimestamp);
+        const endDate = this.mapAuctionEnd.get(auctionId);
+        if (now < endDate) {
+            throw new Revert('Opnosis: auction has not ended');
+        }
+
+        // Only record once — first caller sets the block height.
+        let closeBlock = this.mapAuctionCloseBlock.get(auctionId);
+        if (u256.eq(closeBlock, u256.Zero)) {
+            closeBlock = u256.fromU64(Blockchain.block.number);
+            this.mapAuctionCloseBlock.set(auctionId, closeBlock);
+        }
+
+        const response = new BytesWriter(U256_BYTE_LENGTH);
+        response.writeU256(closeBlock);
+        return response;
+    }
+
+    /**
      * Settle the auction: find the clearing price, send proceeds to the auctioneer,
      * and mark the auction as finished.
      *
@@ -1238,18 +1322,20 @@ export class Opnosis extends OP_NET {
         const minFunding = this.mapMinFunding.get(auctionId);
 
         // When clearing stayed at CLEARING_NONE (initial auction order):
-        // all collected bids (interimSumBid after full sweep) are the total bidding raised.
+        // all collected bids (interimSumBid after full sweep, above-reserve only)
+        // are the total bidding raised.
         if (u256.eq(clearingOrderId, CLEARING_NONE)) {
             const interimSumBid = this.mapInterimSumBid.get(auctionId);
             this.mapBidRaised.set(auctionId, interimSumBid);
             // Volume at clearing = all raised bidding tokens (whole auctionedSellAmount on offer).
             this.mapVolumeClearing.set(auctionId, interimSumBid);
 
-            // CRITICAL: If total bidding exceeds the floor requirement (minBuyAmount),
-            // adjust the clearing sell amount upward so each bidder receives tokens
-            // proportional to their share of total bidding, not at the floor rate.
-            // Without this, sum of claims would exceed auctionedSellAmount.
-            if (interimSumBid > clearingSellAmt) {
+            // Adjust clearingSellAmt to interimSumBid so ALL auctioning tokens are
+            // distributed proportionally among above-reserve bidders. Without this,
+            // the reserve price would cap distribution and return unsold tokens to the
+            // auctioneer — but the intended behavior is full distribution when min
+            // funding is met. Guard against zero to prevent division by zero in claims.
+            if (interimSumBid > u256.Zero) {
                 this.mapClearingSellAmt.set(auctionId, interimSumBid);
             }
         }
@@ -1340,6 +1426,8 @@ export class Opnosis extends OP_NET {
         const clearingOrderId = this.mapClearingOrderId.get(auctionId); // CLEARING_NONE or orderId
         const volumeClearing = this.mapVolumeClearing.get(auctionId);
         const fundingNotReached = !u256.eq(this.mapFundingNotReached.get(auctionId), u256.Zero);
+        const auctionedSellAmount = this.mapSellAmount.get(auctionId);
+        const minBuyAmountBidding = this.mapMinBuyAmount.get(auctionId);
 
         // clearingRank = mapInterimRank when a bidder order was the clearing order.
         // If CLEARING_NONE, all orders are "above" clearing (fully filled).
@@ -1388,12 +1476,19 @@ export class Opnosis extends OP_NET {
                 // ── Auction failed: full bidding-token refund ─────────────────
                 biddingAmt = orderSell;
             } else if (u256.eq(clearingOrderId, CLEARING_NONE)) {
-                // ── Initial auction order is clearing price ────────────────────
-                // All non-cancelled orders are fully filled at the floor price.
-                auctioningAmt = SafeMath.div(
-                    SafeMath.mul(orderSell, clearingBuyAmount),
-                    clearingSellAmt,
-                );
+                // ── No clearing order found: distribute all tokens proportionally
+                // to above-reserve bidders. Below-reserve bids get full refund.
+                const orderBuy = this.mapOrderBuy.get(key);
+                const minBuyAmountBidding = this.mapMinBuyAmount.get(auctionId);
+                if (meetsMinPrice(orderSell, orderBuy, minBuyAmountBidding, auctionedSellAmount)) {
+                    auctioningAmt = SafeMath.div(
+                        SafeMath.mul(orderSell, clearingBuyAmount),
+                        clearingSellAmt,
+                    );
+                } else {
+                    // Below reserve: full refund of bidding tokens.
+                    biddingAmt = orderSell;
+                }
             } else if (u256.eq(orderId, clearingOrderId)) {
                 // ── This order IS the clearing order: partial fill ────────────
                 auctioningAmt = SafeMath.div(

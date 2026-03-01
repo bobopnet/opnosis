@@ -43,6 +43,7 @@ interface OpnosisMethods {
         auctionId: bigint,
         iterationSteps: bigint,
     ) => Promise<SimResult>;
+    readonly recordAuctionClose: (auctionId: bigint) => Promise<SimResult>;
     readonly settleAuction: (auctionId: bigint) => Promise<SimResult>;
     readonly claimFromParticipantOrder: (
         auctionId: bigint,
@@ -172,6 +173,10 @@ export class OpnosisContract {
         iterationSteps: bigint,
     ): Promise<SimResult> {
         return this.#contract.precalculateSellAmountSum(auctionId, iterationSteps);
+    }
+
+    public async simulateRecordAuctionClose(auctionId: bigint): Promise<SimResult> {
+        return this.#contract.recordAuctionClose(auctionId);
     }
 
     public async simulateSettle(auctionId: bigint): Promise<SimResult> {

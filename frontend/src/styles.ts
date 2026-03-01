@@ -104,13 +104,14 @@ export const inputFocus: React.CSSProperties = {
     boxShadow: `0 0 0 3px rgba(155, 77, 187, 0.15)`,
 };
 
-export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple' | 'pending'): React.CSSProperties => {
+export const badge = (variant: 'amber' | 'success' | 'muted' | 'purple' | 'pending' | 'error'): React.CSSProperties => {
     const map = {
         amber: { bg: 'rgba(232, 148, 26, 0.15)', fg: color.amberLight },
         success: { bg: 'rgba(16, 185, 129, 0.15)', fg: color.success },
         muted: { bg: 'rgba(107, 101, 96, 0.2)', fg: color.textMuted },
         purple: { bg: 'rgba(107, 45, 123, 0.2)', fg: color.purpleLight },
         pending: { bg: 'rgba(107, 45, 123, 0.15)', fg: color.purpleLight },
+        error: { bg: 'rgba(239, 68, 68, 0.15)', fg: color.error },
     };
     const { bg, fg } = map[variant];
     return {

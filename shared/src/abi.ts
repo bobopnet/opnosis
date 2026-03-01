@@ -55,6 +55,12 @@ export const OPNOSIS_ABI: BitcoinInterfaceAbi = [
         type: BitcoinAbiTypes.Function,
     },
     {
+        name: 'recordAuctionClose',
+        inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'blockHeight', type: ABIDataTypes.UINT256 }],
+        type: BitcoinAbiTypes.Function,
+    },
+    {
         name: 'settleAuction',
         inputs: [{ name: 'auctionId', type: ABIDataTypes.UINT256 }],
         outputs: [{ name: 'clearingBuyAmount', type: ABIDataTypes.UINT256 }],
