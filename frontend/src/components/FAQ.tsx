@@ -129,6 +129,7 @@ const fieldTable = (
             <tr><td style={s.tdField}>Min Buy Amount</td><td style={s.td}>Minimum total bids you will accept. Sets the reserve price. Bids below the reserve are accepted on-chain but will be treated as losing bids during settlement and automatically refunded.</td></tr>
             <tr><td style={s.tdField}>Min Bid Per Order</td><td style={s.td}>Smallest individual bid allowed. Prevents dust bids.</td></tr>
             <tr><td style={s.tdField}>Min Funding Threshold</td><td style={s.td}>Minimum number of bidding tokens the auctioneer expects to receive. If not met, the auction fails and all tokens are returned. Only bids at or above the reserve price count toward meeting this threshold — below-reserve bids are excluded. 0 = disabled.</td></tr>
+            <tr><td style={s.tdField}>Start Mode</td><td style={s.td}>&ldquo;Start Now&rdquo; opens bidding immediately. &ldquo;Schedule Start&rdquo; delays bidding until a chosen date and time. Note: scheduled times are based on blockchain time, which can differ from your wall clock by a few minutes.</td></tr>
             <tr><td style={s.tdField}>Cancel Window</td><td style={s.td}>Minutes during which bidders can cancel. After this, bids are final.</td></tr>
             <tr><td style={s.tdField}>Auction Duration</td><td style={s.td}>Minutes the auction accepts bids before settlement.</td></tr>
             <tr><td style={s.tdField}>Atomic Closure</td><td style={s.td}>When enabled, the auctioneer can settle the auction early once the min funding threshold is met. When disabled, the auction always runs for the full duration.</td></tr>
@@ -329,6 +330,15 @@ const sections: Section[] = [
                 id: 'bitcoin-native',
                 q: 'What network does Opnosis run on?',
                 a: 'Opnosis Auction runs on OPNet, a smart-contract layer on Bitcoin Layer 1. Transactions are secured by Bitcoin\u2019s proof-of-work consensus. The platform supports both testnet and mainnet.',
+            },
+            {
+                id: 'blockchain-time',
+                q: 'Why is the scheduled start time slightly different from what I entered?',
+                a: <>
+                    All auction timing (start, cancel window, end) is based on <strong>blockchain time</strong>, not your local wall clock. Bitcoin block timestamps use median time of previous blocks, which can differ from real-world time by a few minutes.
+                    <br /><br />
+                    This means a scheduled start of 10:00 AM may appear to start at 9:58 or 10:03 depending on how the blockchain clock compares to your local time. This is normal and expected behavior &mdash; it ensures all participants see consistent, tamper-proof timing enforced by the Bitcoin network.
+                </>,
             },
             {
                 id: 'auto-settlement',

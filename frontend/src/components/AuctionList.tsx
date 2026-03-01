@@ -521,7 +521,8 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
 
             {/* Cancel window — only show when a cancel window was configured */}
             {a.hasCancelWindow && !a.isSettled && (() => {
-                const cancelEnded = BigInt(Date.now()) >= BigInt(a.cancellationEndDate);
+                const status = liveStatus(a);
+                const cancelEnded = status === 'cancellation_closed' || status === 'ended' || status === 'settled';
                 return (
                     <div style={{ marginBottom: '8px' }}>
                         <div style={s.metaLabel}>{cancelEnded ? 'Cancel Window Has Ended' : 'Cancel Window Ends'}</div>
@@ -563,7 +564,7 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                                     <tr style={{ borderBottom: `1px solid ${color.borderStrong}` }}>
                                         <th style={thStyle}>#</th>
                                         <th style={thStyle}>Bid Amount</th>
-                                        <th style={thStyle}>Min Receive</th>
+                                        <th style={thStyle}>Min {a.auctioningTokenSymbol || 'Token'} Received</th>
                                         <th style={thStyle}>Address</th>
                                         <th style={thStyle}>Status</th>
                                     </tr>
@@ -687,8 +688,8 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                 </div>
             )}
 
-            {/* Place Bid — hide when settling */}
-            {(liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed') && !settledIds.has(a.id) && (() => {
+            {/* Place Bid — hide for auctioneer and when settling */}
+            {(liveStatus(a) === 'open' || liveStatus(a) === 'cancellation_closed') && !settledIds.has(a.id) && !(connected && hexAddress && a.auctioneerAddress && hexAddress.toLowerCase() === a.auctioneerAddress.toLowerCase()) && (() => {
                 // Real-time validation
                 const sellParsed = bidSellAmount ? parseTokenAmount(bidSellAmount, a.biddingTokenDecimals) : 0n;
                 const minBidPerOrder = BigInt(a.minimumBiddingAmountPerOrder || '0');
@@ -707,7 +708,7 @@ export function AuctionList({ connected, opnosis, refreshKey, pendingAuctions, o
                             <input style={inputStyle} value={bidMaxUsd} onChange={(e) => onMaxUsdChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Min Receive ({a.auctioningTokenSymbol})<HelpTip text={`The minimum number of ${a.auctioningTokenSymbol || 'auction tokens'} you want to receive for your bid. If the clearing price is above your max, your bid won't win and you'll be refunded automatically.`} /></label>
+                            <label style={labelStyle}>Min {a.auctioningTokenSymbol || 'Token'} Received<HelpTip text={`The minimum number of ${a.auctioningTokenSymbol || 'auction tokens'} you want to receive for your bid. If the clearing price is above your max, your bid won't win and you'll be refunded automatically.`} /></label>
                             <input style={inputStyle} value={bidMinReceive} onChange={(e) => onMinReceiveChange(e.target.value)} placeholder="0" onClick={(e) => e.stopPropagation()} />
                         </div>
                     </div>

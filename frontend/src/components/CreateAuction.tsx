@@ -120,10 +120,14 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
     const [sellAmount, setSellAmount] = useState('0');
     const [reservePriceUsd, setReservePriceUsd] = useState('0');
     const [minReceiveBidding, setMinReceiveBidding] = useState('0');
+    const [minReceiveUsd, setMinReceiveUsd] = useState('0');
     const [minBidPerOrder, setMinBidPerOrder] = useState('0');
     const [minFunding, setMinFunding] = useState('0');
+    const [minFundingUsd, setMinFundingUsd] = useState('0');
     const [startMode, setStartMode] = useState<'now' | 'schedule'>('now');
-    const [scheduledStart, setScheduledStart] = useState('');
+    const [scheduledDate, setScheduledDate] = useState('');
+    const [scheduledTime, setScheduledTime] = useState('12:00');
+    const [scheduledAmPm, setScheduledAmPm] = useState<'AM' | 'PM'>('AM');
     const [cancelDays, setCancelDays] = useState('0');
     const [cancelHours, setCancelHours] = useState('0');
     const [cancelMinutes, setCancelMinutes] = useState('0');
@@ -178,17 +182,40 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         const price = parseFloat(val);
         const sell = parseFloat(sellAmount);
         if (price > 0 && sell > 0) {
-            setMinReceiveBidding(Math.floor((price * sell) / biddingTokenUsdPrice!).toString());
+            const tokens = Math.floor((price * sell) / biddingTokenUsdPrice!);
+            setMinReceiveBidding(tokens.toString());
+            setMinReceiveUsd((tokens * biddingTokenUsdPrice!).toFixed(2).replace(/\.?0+$/, ''));
         }
     };
 
-    const onMinReceiveChange = (val: string) => {
-        setMinReceiveBidding(val.replace(/\./g, ''));
+    const onMinReceiveTokenChange = (val: string) => {
+        setMinReceiveBidding(val);
         if (!canCompute) return;
         const minRcv = parseFloat(val);
         const sell = parseFloat(sellAmount);
+        if (minRcv > 0) {
+            setMinReceiveUsd((minRcv * biddingTokenUsdPrice!).toFixed(2).replace(/\.?0+$/, ''));
+        } else {
+            setMinReceiveUsd('0');
+        }
         if (minRcv > 0 && sell > 0) {
             setReservePriceUsd(((minRcv * biddingTokenUsdPrice!) / sell).toFixed(8).replace(/\.?0+$/, ''));
+        }
+    };
+
+    const onMinReceiveUsdChange = (val: string) => {
+        setMinReceiveUsd(val);
+        if (!canCompute) return;
+        const usd = parseFloat(val);
+        if (usd > 0) {
+            const tokens = Math.floor(usd / biddingTokenUsdPrice!);
+            setMinReceiveBidding(tokens.toString());
+            const sell = parseFloat(sellAmount);
+            if (sell > 0) {
+                setReservePriceUsd((usd / sell).toFixed(8).replace(/\.?0+$/, ''));
+            }
+        } else {
+            setMinReceiveBidding('0');
         }
     };
 
@@ -199,7 +226,31 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
         const price = parseFloat(reservePriceUsd);
         const sell = parseFloat(val);
         if (price > 0 && sell > 0) {
-            setMinReceiveBidding(Math.floor((price * sell) / biddingTokenUsdPrice!).toString());
+            const tokens = Math.floor((price * sell) / biddingTokenUsdPrice!);
+            setMinReceiveBidding(tokens.toString());
+            setMinReceiveUsd((tokens * biddingTokenUsdPrice!).toFixed(2).replace(/\.?0+$/, ''));
+        }
+    };
+
+    const onMinFundingUsdChange = (val: string) => {
+        setMinFundingUsd(val);
+        if (!canCompute) return;
+        const usd = parseFloat(val);
+        if (usd > 0) {
+            setMinFunding((usd / biddingTokenUsdPrice!).toFixed(8).replace(/\.?0+$/, ''));
+        } else {
+            setMinFunding('0');
+        }
+    };
+
+    const onMinFundingTokenChange = (val: string) => {
+        setMinFunding(val);
+        if (!canCompute) return;
+        const tokens = parseFloat(val);
+        if (tokens > 0) {
+            setMinFundingUsd((tokens * biddingTokenUsdPrice!).toFixed(2).replace(/\.?0+$/, ''));
+        } else {
+            setMinFundingUsd('0');
         }
     };
 
@@ -233,8 +284,15 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
 
         let orderPlacementStartDate = 0n;
         let baseTime = nowMs;
-        if (startMode === 'schedule' && scheduledStart) {
-            const startTs = BigInt(new Date(scheduledStart).getTime());
+        if (startMode === 'schedule' && scheduledTime) {
+            const dateStr = scheduledDate || new Date().toISOString().split('T')[0];
+            const [hStr, mStr] = scheduledTime.split(':');
+            let hour = parseInt(hStr, 10) || 0;
+            if (scheduledAmPm === 'PM' && hour < 12) hour += 12;
+            if (scheduledAmPm === 'AM' && hour === 12) hour = 0;
+            const h24 = hour.toString().padStart(2, '0');
+            const min = (mStr || '00').padStart(2, '0');
+            const startTs = BigInt(new Date(`${dateStr}T${h24}:${min}`).getTime());
             orderPlacementStartDate = startTs;
             baseTime = startTs;
         }
@@ -315,13 +373,17 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     <input style={inputStyle} inputMode="decimal" value={sellAmount} onChange={(e) => onSellAmountChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!sellAmount) setSellAmount('0'); }} placeholder="0" />
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Min Funding Threshold{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ''}<HelpTip text="The minimum total amount of bidding tokens that must be raised for the auction to succeed. If the total bid amount does not reach this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 for no minimum — the auction will succeed regardless of how much is raised." /></label>
-                    <input style={inputStyle} inputMode="decimal" value={minFunding} onChange={(e) => setMinFunding(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minFunding) setMinFunding('0'); }} placeholder="0" />
-                    {(() => {
-                        const val = parseFloat(minFunding);
-                        if (!val || val <= 0 || biddingTokenUsdPrice === null) return null;
-                        return <span style={{ color: color.textMuted, fontSize: '13px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>(${(val * biddingTokenUsdPrice).toFixed(2)} USD)</span>;
-                    })()}
+                    <label style={labelStyle}>Min Funding Threshold<HelpTip text="The minimum total amount that must be raised for the auction to succeed. If the total bid amount does not reach this threshold, the auction is cancelled and all tokens are returned to their owners. Set to 0 for no minimum — the auction will succeed regardless of how much is raised." /></label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, position: 'relative' as const }}>
+                            <input style={{ ...inputStyle, paddingRight: biddingTokenSymbol ? `${biddingTokenSymbol.length * 8 + 16}px` : '40px' }} inputMode="decimal" value={minFunding} onChange={(e) => onMinFundingTokenChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minFunding) setMinFunding('0'); }} placeholder="0" />
+                            <span style={{ position: 'absolute' as const, right: '10px', top: '50%', transform: 'translateY(-50%)', color: color.textMuted, fontSize: '12px', fontFamily: font.body, pointerEvents: 'none' as const }}>{biddingTokenSymbol || 'Token'}</span>
+                        </div>
+                        <div style={{ flex: 1, position: 'relative' as const }}>
+                            <input style={{ ...inputStyle, paddingRight: '40px' }} inputMode="decimal" value={minFundingUsd} onChange={(e) => onMinFundingUsdChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minFundingUsd) setMinFundingUsd('0'); }} placeholder="0" />
+                            <span style={{ position: 'absolute' as const, right: '10px', top: '50%', transform: 'translateY(-50%)', color: color.textMuted, fontSize: '12px', fontFamily: font.body, pointerEvents: 'none' as const }}>USD</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div style={s.row}>
@@ -330,13 +392,17 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                     <input style={inputStyle} inputMode="decimal" value={reservePriceUsd} onChange={(e) => onReservePriceChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!reservePriceUsd) setReservePriceUsd('0'); }} placeholder="0" />
                 </div>
                 <div style={s.field}>
-                    <label style={labelStyle}>Min Receive{biddingTokenSymbol ? ` (${biddingTokenSymbol})` : ' (bidding token)'}<HelpTip text="The minimum total bidding tokens you will receive if all auction tokens are sold. Auto-calculated from Total Auction Tokens and Reserve Price, or enter directly to set the reserve price." /></label>
-                    <input style={inputStyle} inputMode="decimal" value={minReceiveBidding} onChange={(e) => onMinReceiveChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minReceiveBidding) setMinReceiveBidding('0'); }} placeholder="0" />
-                    {biddingTokenUsdPrice === null && biddingToken && (
-                        <span style={{ color: color.textMuted, fontSize: '12px', fontFamily: font.body, marginTop: '4px', display: 'inline-block' }}>
-                            USD price unavailable — enter min receive directly.
-                        </span>
-                    )}
+                    <label style={labelStyle}>Min Received for Entire Lot<HelpTip text="The minimum total bidding tokens you will receive for the entire batch of auction tokens. Auto-calculated from Total Auction Tokens and Reserve Price, or enter directly to set the reserve price." /></label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ flex: 1, position: 'relative' as const }}>
+                            <input style={{ ...inputStyle, paddingRight: biddingTokenSymbol ? `${biddingTokenSymbol.length * 8 + 16}px` : '40px' }} inputMode="decimal" value={minReceiveBidding} onChange={(e) => onMinReceiveTokenChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minReceiveBidding) setMinReceiveBidding('0'); }} placeholder="0" />
+                            <span style={{ position: 'absolute' as const, right: '10px', top: '50%', transform: 'translateY(-50%)', color: color.textMuted, fontSize: '12px', fontFamily: font.body, pointerEvents: 'none' as const }}>{biddingTokenSymbol || 'Token'}</span>
+                        </div>
+                        <div style={{ flex: 1, position: 'relative' as const }}>
+                            <input style={{ ...inputStyle, paddingRight: '40px' }} inputMode="decimal" value={minReceiveUsd} onChange={(e) => onMinReceiveUsdChange(e.target.value.replace(/[^0-9.]/g, ''))} onFocus={(e) => e.target.select()} onBlur={() => { if (!minReceiveUsd) setMinReceiveUsd('0'); }} placeholder="0" />
+                            <span style={{ position: 'absolute' as const, right: '10px', top: '50%', transform: 'translateY(-50%)', color: color.textMuted, fontSize: '12px', fontFamily: font.body, pointerEvents: 'none' as const }}>USD</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div style={s.row}>
@@ -353,12 +419,32 @@ export function CreateAuction({ connected, network, opnosis, onCreated }: Props)
                         </label>
                     </div>
                     {startMode === 'schedule' && (
-                        <input
-                            style={{ ...inputStyle, colorScheme: 'dark' }}
-                            type="datetime-local"
-                            value={scheduledStart}
-                            onChange={(e) => setScheduledStart(e.target.value)}
-                        />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                            <input
+                                style={{ ...inputStyle, flex: 1, colorScheme: 'dark' }}
+                                type="date"
+                                value={scheduledDate}
+                                onChange={(e) => setScheduledDate(e.target.value)}
+                            />
+                            <input
+                                style={{ ...inputStyle, width: '120px', colorScheme: 'dark' }}
+                                type="time"
+                                step="60"
+                                value={scheduledTime}
+                                onChange={(e) => {
+                                    const [h, m] = e.target.value.split(':');
+                                    setScheduledTime(`${(h || '12').padStart(2, '0')}:${(m || '00').padStart(2, '0')}`);
+                                }}
+                            />
+                            <select
+                                style={{ ...inputStyle, width: '70px', cursor: 'pointer' }}
+                                value={scheduledAmPm}
+                                onChange={(e) => setScheduledAmPm(e.target.value as 'AM' | 'PM')}
+                            >
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                        </div>
                     )}
                 </div>
                 <div style={s.field}>

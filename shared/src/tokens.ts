@@ -32,4 +32,11 @@ export const KNOWN_TOKENS: readonly KnownToken[] = [
         mainnet: '',
         biddingOnly: true,
     },
+    {
+        symbol: 'ORNGE',
+        name: 'Ornge',
+        decimals: 8,
+        testnet: '0x46c631ec33a79cf74bd87790c05d833f6604f90cca16cbb7c468c59c6a073b2a',
+        mainnet: '',
+    },
 ];

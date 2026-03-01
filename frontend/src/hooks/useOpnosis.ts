@@ -228,12 +228,26 @@ export function useOpnosis(
         try {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const sim = await contract.simulateExtendAuction(auctionId, newCancellationEndDate, newAuctionEndDate);
+            if ('error' in sim) {
+                const errMsg = String((sim as { error: unknown }).error);
+                if (errMsg.toLowerCase().includes('ended') || errMsg.toLowerCase().includes('settled')) {
+                    setTxState({ status: 'error', message: 'Auction has already ended and cannot be extended.' });
+                } else {
+                    setTxState({ status: 'error', message: `Simulation failed: ${errMsg}` });
+                }
+                return false;
+            }
             setTxState({ status: 'pending', message: 'Confirm in OP_WALLET...' });
             await sendSimulation(sim);
             setTxState({ status: 'success', message: 'Auction extended!' });
             return true;
         } catch (err) {
-            setTxState({ status: 'error', message: err instanceof Error ? err.message : 'Failed' });
+            const msg = err instanceof Error ? err.message : 'Failed';
+            if (msg.includes('fetch') || msg.includes('network')) {
+                setTxState({ status: 'error', message: 'Auction may have ended — unable to submit extension. Please refresh and check the auction status.' });
+            } else {
+                setTxState({ status: 'error', message: msg });
+            }
             return false;
         }
     }, [contract]);

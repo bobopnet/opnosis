@@ -154,6 +154,9 @@ export function ResultsList() {
             const fromClearing = sellAmt * clearSell / clearBuy;
             raisedTokens = totalBidAmt < fromClearing ? totalBidAmt : fromClearing;
         } else {
+            // Before settlement, estimate raised as totalBidAmount
+            // (below-reserve bids won't actually contribute, but we don't know
+            // the exact split until settlement computes the clearing price)
             raisedTokens = BigInt(a.totalBidAmount || '0');
         }
         const raisedHuman = Number(raisedTokens) / (10 ** a.biddingTokenDecimals);
@@ -180,7 +183,7 @@ export function ResultsList() {
     }), [rows]);
 
     const totalRaisedUsd = useMemo(
-        () => computed.reduce((sum, r) => sum + r.raisedUsd, 0),
+        () => computed.reduce((sum, r) => r.a.isSettled ? sum + r.raisedUsd : sum, 0),
         [computed],
     );
 
@@ -240,17 +243,17 @@ export function ResultsList() {
                                         {formatTokenAmount(totalBidAmt, a.biddingTokenDecimals).split('.')[0]} {a.biddingTokenSymbol}
                                     </td>
                                     <td style={s.td}>
-                                        {isFailed ? '--' : `${formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`}
+                                        {isFailed ? '--' : !isSettled ? <span style={{ color: color.textMuted }}>Pending</span> : `${formatTokenAmount(raisedTokens, a.biddingTokenDecimals).split('.')[0]} ${a.biddingTokenSymbol}`}
                                     </td>
-                                    <td style={s.td}>{raisedUsdStr}</td>
+                                    <td style={s.td}>{!isSettled && !isFailed ? <span style={{ color: color.textMuted }}>Pending</span> : raisedUsdStr}</td>
                                     <td style={s.td}>
                                         <span style={{ color: isSettled && !isFailed ? color.amber : color.textMuted, fontWeight: isSettled && !isFailed ? 600 : 400 }}>
                                             {clearingPrice}
                                         </span>
                                     </td>
                                     <td style={s.td}>
-                                        <span style={badgeStyle(isFailed ? 'muted' : isSettled ? 'success' : 'muted')}>
-                                            {isFailed ? 'Failed' : isSettled ? 'Settled' : 'Ended'}
+                                        <span style={badgeStyle(isFailed ? 'muted' : isSettled ? 'success' : 'purple')}>
+                                            {isFailed ? 'Failed' : isSettled ? 'Settled' : 'Settling'}
                                         </span>
                                     </td>
                                 </tr>
